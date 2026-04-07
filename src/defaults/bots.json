@@ -1,0 +1,234 @@
+{
+  "categories": {
+    "ai-crawler": "AI training data crawlers",
+    "ai-assistant": "AI assistants fetching live content for users",
+    "ai-search": "AI-powered search engines",
+    "agent": "AI coding agents and tool-use agents",
+    "search-crawler": "Traditional search engine crawlers",
+    "seo-bot": "SEO/marketing analysis bots",
+    "monitoring": "Uptime and performance monitors",
+    "social-preview": "Social media link preview fetchers"
+  },
+  "bots": [
+    { "pattern": "Code/", "name": "GitHub Copilot", "company": "Microsoft", "category": "agent" },
+    {
+      "pattern": "Google-Gemini-CLI",
+      "name": "Gemini CLI",
+      "company": "Google",
+      "category": "agent"
+    },
+
+    { "pattern": "GPTBot", "name": "GPTBot", "company": "OpenAI", "category": "ai-crawler" },
+    {
+      "pattern": "ChatGPT-User",
+      "name": "ChatGPT-User",
+      "company": "OpenAI",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "OAI-SearchBot",
+      "name": "OAI-SearchBot",
+      "company": "OpenAI",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "ClaudeBot",
+      "name": "ClaudeBot",
+      "company": "Anthropic",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Claude-Web",
+      "name": "Claude-Web",
+      "company": "Anthropic",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "anthropic-ai",
+      "name": "Anthropic AI",
+      "company": "Anthropic",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "PerplexityBot",
+      "name": "PerplexityBot",
+      "company": "Perplexity",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Google-Extended",
+      "name": "Google-Extended",
+      "company": "Google",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "GoogleOther",
+      "name": "GoogleOther",
+      "company": "Google",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Google-CloudVertexBot",
+      "name": "Google-CloudVertexBot",
+      "company": "Google",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "Meta-ExternalAgent",
+      "name": "Meta-ExternalAgent",
+      "company": "Meta",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "meta-externalagent",
+      "name": "Meta-ExternalAgent",
+      "company": "Meta",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "meta-externalfetcher",
+      "name": "Meta Fetcher",
+      "company": "Meta",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Bytespider",
+      "name": "Bytespider",
+      "company": "ByteDance",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Applebot-Extended",
+      "name": "Applebot-Extended",
+      "company": "Apple",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "CCBot",
+      "name": "CCBot",
+      "company": "Common Crawl",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "cohere-ai",
+      "name": "Cohere AI",
+      "company": "Cohere",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Amazonbot",
+      "name": "Amazonbot",
+      "company": "Amazon",
+      "category": "ai-crawler"
+    },
+    { "pattern": "YouBot", "name": "YouBot", "company": "You.com", "category": "ai-search" },
+    { "pattern": "Diffbot", "name": "Diffbot", "company": "Diffbot", "category": "ai-crawler" },
+    {
+      "pattern": "img2dataset",
+      "name": "img2dataset",
+      "company": "LAION",
+      "category": "ai-crawler"
+    },
+    { "pattern": "Timpibot", "name": "Timpibot", "company": "Timpi", "category": "ai-search" },
+
+    {
+      "pattern": "Googlebot",
+      "name": "Googlebot",
+      "company": "Google",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "bingbot",
+      "name": "Bingbot",
+      "company": "Microsoft",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Baiduspider",
+      "name": "Baiduspider",
+      "company": "Baidu",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "YandexBot",
+      "name": "YandexBot",
+      "company": "Yandex",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "DuckDuckBot",
+      "name": "DuckDuckBot",
+      "company": "DuckDuckGo",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Applebot",
+      "name": "Applebot",
+      "company": "Apple",
+      "category": "search-crawler"
+    },
+
+    { "pattern": "AhrefsBot", "name": "AhrefsBot", "company": "Ahrefs", "category": "seo-bot" },
+    { "pattern": "SemrushBot", "name": "SemrushBot", "company": "Semrush", "category": "seo-bot" },
+    { "pattern": "MJ12bot", "name": "MJ12bot", "company": "Majestic", "category": "seo-bot" },
+    { "pattern": "DotBot", "name": "DotBot", "company": "Moz", "category": "seo-bot" },
+    { "pattern": "BLEXBot", "name": "BLEXBot", "company": "BLEXBot", "category": "seo-bot" },
+    { "pattern": "AwarioBot", "name": "AwarioBot", "company": "Awario", "category": "seo-bot" },
+
+    {
+      "pattern": "UptimeRobot",
+      "name": "UptimeRobot",
+      "company": "UptimeRobot",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "Pingdom",
+      "name": "Pingdom",
+      "company": "Pingdom",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "StatusCake",
+      "name": "StatusCake",
+      "company": "StatusCake",
+      "category": "monitoring"
+    },
+
+    {
+      "pattern": "Twitterbot",
+      "name": "Twitterbot",
+      "company": "X/Twitter",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "facebookexternalhit",
+      "name": "Facebook Preview",
+      "company": "Meta",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "LinkedInBot",
+      "name": "LinkedInBot",
+      "company": "LinkedIn",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Slackbot",
+      "name": "Slackbot",
+      "company": "Slack",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Slack-ImgProxy",
+      "name": "Slack-ImgProxy",
+      "company": "Slack",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Discordbot",
+      "name": "Discordbot",
+      "company": "Discord",
+      "category": "social-preview"
+    }
+  ]
+}

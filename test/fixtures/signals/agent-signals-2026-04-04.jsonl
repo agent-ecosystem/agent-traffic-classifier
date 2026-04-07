@@ -1,0 +1,5 @@
+{"ip":"1.2.3.4","timestamp":"2026-04-04T20:49:28Z","domain":"example.com","headers":{"User-Agent":"Claude-User/1.0"},"trigger":"content-negotiation"}
+{"ip":"5.6.7.8","timestamp":"2026-04-04T21:00:00Z","domain":"example.com","headers":{"User-Agent":"Mozilla/5.0 Chrome/120.0.0.0","Traceparent":"00-abc-def-01"},"trigger":"content-negotiation"}
+not valid json {{{
+{"timestamp":"2026-04-04T22:00:00Z","headers":{"User-Agent":"test"}}
+{"ip":"9.9.9.9","timestamp":"2026-04-04T22:30:00Z","domain":"other.com","headers":{"User-Agent":"curl/7.68"},"trigger":"direct-md"}

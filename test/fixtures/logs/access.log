@@ -1,0 +1,4 @@
+1.1.1.1 - - [04/Apr/2026:10:00:00 -0700] "GET /about/ HTTP/1.1" 200 5000 "https://google.com" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0"
+2.2.2.2 - - [04/Apr/2026:10:00:01 -0700] "GET / HTTP/1.1" 200 3000 "-" "GPTBot/1.0"
+not a valid log line
+3.3.3.3 - - [04/Apr/2026:10:00:02 -0700] "GET /contact/ HTTP/1.1" 200 2000 "-" "curl/7.68.0"
