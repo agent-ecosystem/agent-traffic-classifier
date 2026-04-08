@@ -1,4 +1,5 @@
 import type {
+  IpInfo,
   SignalClassifierOptions,
   SignalClassifyResult,
   SignalEntry,
@@ -30,6 +31,7 @@ export function createSignalClassifier(options?: SignalClassifierOptions): {
   const devTools = options?.devTools ?? DEFAULT_DEV_TOOLS;
   const agentTriggers = options?.agentTriggers ?? DEFAULT_AGENT_TRIGGERS;
   const heuristics = options?.heuristics ?? DEFAULT_HEURISTICS;
+  const ipLookup = options?.ipLookup;
 
   function classifySignalEntry(entry: SignalEntry): SignalClassifyResult {
     const ua = entry.headers?.['User-Agent'] || '';
@@ -49,9 +51,12 @@ export function createSignalClassifier(options?: SignalClassifierOptions): {
       }
     }
 
-    // Run heuristics (e.g., Cursor detection)
+    // Resolve IP intelligence (once per entry, shared across heuristics)
+    const ipInfo: IpInfo | undefined = ipLookup ? ipLookup(entry.ip) : undefined;
+
+    // Run heuristics (e.g., Cursor detection, Chrome 122 fingerprint)
     for (const heuristic of heuristics) {
-      const result = heuristic(entry);
+      const result = heuristic(entry, ipInfo);
       if (result) return result;
     }
 

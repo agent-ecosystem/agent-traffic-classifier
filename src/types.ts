@@ -39,8 +39,17 @@ export interface SignalClassifyResult {
   company?: string | null;
 }
 
+/** IP intelligence result for a single IP address. */
+export interface IpInfo {
+  cloudProvider?: string; // e.g., "google", "aws", "cloudflare"
+  country?: string; // ISO 3166-1 alpha-2: "CN", "US", etc.
+}
+
+/** Synchronous IP lookup function. Returned by the async adapter factories after initialization. */
+export type IpLookup = (ip: string) => IpInfo;
+
 /** A heuristic function for detecting agents from signal entry headers. */
-export type SignalHeuristic = (entry: SignalEntry) => SignalClassifyResult | null;
+export type SignalHeuristic = (entry: SignalEntry, ipInfo?: IpInfo) => SignalClassifyResult | null;
 
 /** A bot entry in the bot database. */
 export interface BotEntry {
@@ -78,6 +87,7 @@ export interface SignalClassifierOptions {
   devTools?: string[];
   agentTriggers?: Set<string>;
   heuristics?: SignalHeuristic[];
+  ipLookup?: IpLookup;
 }
 
 /** Configuration for the proxy-based agent detected by duplicate-request heuristic. */

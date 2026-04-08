@@ -12,7 +12,12 @@ import {
   DEFAULT_PROXY_WINDOW_SECONDS,
   CURSOR_PROXY_AGENT,
 } from './defaults/sessions.js';
-import { CATEGORY_AGENT, CATEGORY_HUMAN, UNIDENTIFIED_AGENT } from './defaults/categories.js';
+import {
+  CATEGORY_AGENT,
+  CATEGORY_HUMAN,
+  CATEGORY_PROGRAMMATIC,
+  UNIDENTIFIED_AGENT,
+} from './defaults/categories.js';
 
 /**
  * Build agent seeds from signal entries, grouped by domain.
@@ -24,7 +29,6 @@ import { CATEGORY_AGENT, CATEGORY_HUMAN, UNIDENTIFIED_AGENT } from './defaults/c
 export function buildAgentSeeds(
   signalEntries: SignalEntry[],
   classifySignalEntry: (entry: SignalEntry) => SignalClassifyResult,
-  _options?: SessionOptions,
 ): Map<string, Map<string, AgentSeed>> {
   const byDomain = new Map<string, Map<string, AgentSeed>>();
 
@@ -246,4 +250,56 @@ export function detectDuplicateRequestAgents(
   }
 
   return result;
+}
+
+/**
+ * Cross-reference programmatic client IPs with agent signal IPs.
+ *
+ * If a programmatic entry (e.g., python-httpx, undici) comes from the same IP
+ * that also appears in agent signal data, the programmatic traffic is likely
+ * driven by the same agent. This upgrades the entry from "programmatic" to "agent".
+ *
+ * The agent name is taken from the best signal classification for that IP.
+ * Run this after reclassifyEntries and detectDuplicateRequestAgents.
+ */
+export function crossReferenceSignalIps(
+  classifiedEntries: ClassifiedEntry[],
+  signalEntries: SignalEntry[],
+  domain: string,
+  classifySignalEntry: (entry: SignalEntry) => SignalClassifyResult,
+): ClassifiedEntry[] {
+  // Build IP → best agent name map from signal entries for this domain
+  const ipAgents = new Map<string, { name: string; company: string | null }>();
+
+  for (const entry of signalEntries) {
+    if (entry.domain !== domain) continue;
+    const cls = classifySignalEntry(entry);
+    if (!cls.isAgent) continue;
+
+    const name = cls.name ?? UNIDENTIFIED_AGENT;
+    const existing = ipAgents.get(entry.ip);
+
+    // Prefer named agents over "unidentified"
+    if (!existing || (existing.name === UNIDENTIFIED_AGENT && name !== UNIDENTIFIED_AGENT)) {
+      ipAgents.set(entry.ip, { name, company: cls.company ?? null });
+    }
+  }
+
+  if (ipAgents.size === 0) return classifiedEntries;
+
+  return classifiedEntries.map((item) => {
+    if (item.classification.category !== CATEGORY_PROGRAMMATIC) return item;
+
+    const agent = ipAgents.get(item.entry.ip);
+    if (!agent) return item;
+
+    return {
+      entry: item.entry,
+      classification: {
+        category: CATEGORY_AGENT,
+        botName: agent.name,
+        botCompany: agent.company,
+      },
+    };
+  });
 }

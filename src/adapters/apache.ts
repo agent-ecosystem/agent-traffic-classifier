@@ -70,14 +70,6 @@ export function parseApacheTs(ts: string): number | null {
 }
 
 /**
- * Read all access.log files for a domain (current + rotated).
- * Handles plain text and .gz compressed files.
- * Yields parsed LogEntry objects.
- *
- * This is the Apache convenience adapter; consumers with other log
- * formats can skip this and feed LogEntry objects directly.
- */
-/**
  * Extract timezone offset in minutes from a raw Apache timestamp.
  * E.g., "03/Apr/2026:14:22:31 -0700" → -420
  * Returns null for unparseable strings.

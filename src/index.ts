@@ -6,6 +6,8 @@ export type {
   SignalEntry,
   SignalClassifyResult,
   SignalHeuristic,
+  IpInfo,
+  IpLookup,
   BotEntry,
   BotDatabase,
   ClassifierOptions,
@@ -46,8 +48,30 @@ export { createSignalClassifier } from './signals.js';
 // JSONL signal log adapter (convenience layer for PHP shim JSONL format)
 export { parseSignalLog, parseSignalTs } from './adapters/jsonl-signals.js';
 
+// IP intelligence adapter (convenience layer for cloud provider + country lookups)
+export {
+  createIpLookup,
+  createCloudProviderLookup,
+  createCountryLookup,
+  buildCidrIndex,
+  parseIpv4,
+  parseCidr,
+  matchesCidr,
+} from './adapters/ip-ranges.js';
+export type {
+  CidrEntry,
+  CloudProviderLookupOptions,
+  CountryLookupOptions,
+  IpLookupOptions,
+} from './adapters/ip-ranges.js';
+
 // Session attribution
-export { buildAgentSeeds, reclassifyEntries, detectDuplicateRequestAgents } from './sessions.js';
+export {
+  buildAgentSeeds,
+  reclassifyEntries,
+  detectDuplicateRequestAgents,
+  crossReferenceSignalIps,
+} from './sessions.js';
 
 // Date utilities
 export { extractDateKey } from './date.js';
@@ -62,8 +86,16 @@ export {
   DEFAULT_DEV_TOOLS,
   DEFAULT_AGENT_TRIGGERS,
   DEFAULT_HEURISTICS,
+  SUSPECTED_AGENTS,
+  DEFAULT_ACCEPT_TAXONOMY,
   cursorHeuristic,
+  chrome122Heuristic,
+  conversationTrackingHeuristic,
+  markdownMimeHeuristic,
+  acceptTaxonomyHeuristic,
+  missingBrowserHeadersHeuristic,
 } from './defaults/agents.js';
+export type { AcceptPattern } from './defaults/agents.js';
 export {
   DEFAULT_SKIP_EXTENSIONS,
   DEFAULT_SKIP_PATHS,
@@ -84,6 +116,7 @@ export {
   CATEGORY_PROGRAMMATIC,
   CATEGORY_OTHER_BOT,
   CATEGORY_AGENT,
+  CATEGORY_FEED_READER,
   AI_CATEGORY_PREFIX,
   UNIDENTIFIED_AGENT,
 } from './defaults/categories.js';

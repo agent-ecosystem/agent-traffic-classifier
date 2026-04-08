@@ -62,6 +62,77 @@ describe('createClassifier', () => {
       expect(result.category).toBe('agent');
       expect(result.botName).toBe('GitHub Copilot');
     });
+
+    it('classifies GoogleAgent-URLContext as ai-assistant', () => {
+      const result = classify('GoogleAgent-URLContext/1.0');
+      expect(result.category).toBe('ai-assistant');
+      expect(result.botName).toBe('GoogleAgent-URLContext');
+      expect(result.botCompany).toBe('Google');
+    });
+
+    it('classifies ModelContextProtocol as agent', () => {
+      const result = classify('ModelContextProtocol/1.0 (Automate; +https://example.com)');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('MCP Client');
+    });
+
+    it('classifies JarvisSearch as ai-search', () => {
+      const result = classify('JarvisSearch-Crawler/0.1 (https://example.com)');
+      expect(result.category).toBe('ai-search');
+      expect(result.botName).toBe('JarvisSearch');
+    });
+
+    it('classifies Mastodon as social-preview', () => {
+      const result = classify('Mastodon/4.5.8 (https://mastodon.social)');
+      expect(result.category).toBe('social-preview');
+      expect(result.botName).toBe('Mastodon');
+    });
+
+    it('classifies WhatsApp as social-preview', () => {
+      const result = classify('WhatsApp/2.23.20.0');
+      expect(result.category).toBe('social-preview');
+      expect(result.botName).toBe('WhatsApp');
+    });
+
+    it('classifies HackerNews app as feed-reader', () => {
+      const result = classify('HackerNews/1536 CFNetwork/1568.200.51 Darwin/24.1.0');
+      expect(result.category).toBe('feed-reader');
+      expect(result.botName).toBe('HackerNews App');
+    });
+
+    it('classifies FreshRSS as feed-reader', () => {
+      const result = classify('FreshRSS/1.28.1 (Linux; https://freshrss.org)');
+      expect(result.category).toBe('feed-reader');
+      expect(result.botName).toBe('FreshRSS');
+    });
+
+    it('classifies Claude Code (versioned UA) as agent', () => {
+      const result = classify('Claude-User (claude-code/2.1.92; +https://support.anthropic.com/)');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('Claude Code');
+      expect(result.botCompany).toBe('Anthropic');
+    });
+
+    it('classifies Kiro-CLI as agent', () => {
+      const result = classify('Kiro-CLI');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('Kiro');
+      expect(result.botCompany).toBe('Amazon');
+    });
+
+    it('classifies Flipboard as feed-reader', () => {
+      const result = classify(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:49.0) Gecko/20100101 Firefox/49.0 (FlipboardProxy/1.2)',
+      );
+      expect(result.category).toBe('feed-reader');
+      expect(result.botName).toBe('Flipboard');
+    });
+
+    it('classifies Lemmy as social-preview', () => {
+      const result = classify('Lemmy/0.19.17; +https://example.com');
+      expect(result.category).toBe('social-preview');
+      expect(result.botName).toBe('Lemmy');
+    });
   });
 
   describe('programmatic clients', () => {
@@ -87,6 +158,36 @@ describe('createClassifier', () => {
       const result = classify('Go-http-client/2.0');
       expect(result.category).toBe('programmatic');
       expect(result.botName).toBe('Go-http-client');
+    });
+
+    it('classifies newspaper', () => {
+      const result = classify('newspaper/0.2.8');
+      expect(result.category).toBe('programmatic');
+      expect(result.botName).toBe('newspaper');
+    });
+
+    it('classifies undici', () => {
+      const result = classify('undici');
+      expect(result.category).toBe('programmatic');
+      expect(result.botName).toBe('undici');
+    });
+
+    it('classifies trafilatura', () => {
+      const result = classify('trafilatura/2.0.0 (+https://github.com/adbar/trafilatura)');
+      expect(result.category).toBe('programmatic');
+      expect(result.botName).toBe('trafilatura');
+    });
+
+    it('classifies http.rb', () => {
+      const result = classify('http.rb/5.1.1');
+      expect(result.category).toBe('programmatic');
+      expect(result.botName).toBe('http.rb');
+    });
+
+    it('classifies http.rb with Mastodon as social-preview (bot list wins)', () => {
+      const result = classify('http.rb/5.1.1 (Mastodon/4.5.8; +https://mastodon.social/)');
+      expect(result.category).toBe('social-preview');
+      expect(result.botName).toBe('Mastodon');
     });
 
     it('classifies exact-match "node"', () => {

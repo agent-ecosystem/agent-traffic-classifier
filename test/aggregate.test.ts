@@ -133,16 +133,19 @@ describe('aggregate', () => {
     expect(docs[0].summary.byCategory.agent.requests).toBe(1);
   });
 
-  it('uses shouldSkip to filter content pages for topPaths', () => {
+  it('uses shouldSkip to exclude entries from all stats', () => {
     const shouldSkip = createFilter();
     const entries: ClassifiedEntry[] = [
       makeClassified({ path: '/about/' }, { category: 'human' }),
       makeClassified({ path: '/style.css' }, { category: 'human' }),
+      makeClassified({ path: '/.env' }, { category: 'human' }),
     ];
     const docs = aggregate(entries, { domain: 'example.com', shouldSkip });
-    // /style.css is skipped by the filter, only /about/ appears in topPaths
+    // /style.css and /.env are skipped — only /about/ counts
     expect(docs[0].topPaths).toHaveLength(1);
     expect(docs[0].topPaths[0].path).toBe('/about/');
+    expect(docs[0].summary.totalRequests).toBe(1);
+    expect(docs[0].summary.byCategory.human.requests).toBe(1);
   });
 
   it('tracks referrers for human traffic only', () => {

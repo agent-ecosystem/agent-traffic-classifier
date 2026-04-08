@@ -10,6 +10,9 @@ export const CATEGORY_PROGRAMMATIC = 'programmatic';
 /** Category for bots detected by the isbot library but not in the curated list. */
 export const CATEGORY_OTHER_BOT = 'other-bot';
 
+/** Category for feed readers and news apps (user-initiated, not bots). */
+export const CATEGORY_FEED_READER = 'feed-reader';
+
 /** Category for traffic reclassified as AI coding agent via signal attribution. */
 export const CATEGORY_AGENT = 'agent';
 

@@ -7,7 +7,8 @@
     "search-crawler": "Traditional search engine crawlers",
     "seo-bot": "SEO/marketing analysis bots",
     "monitoring": "Uptime and performance monitors",
-    "social-preview": "Social media link preview fetchers"
+    "social-preview": "Social media link preview fetchers",
+    "feed-reader": "Feed readers and news apps (user-initiated)"
   },
   "bots": [
     { "pattern": "Code/", "name": "GitHub Copilot", "company": "Microsoft", "category": "agent" },
@@ -15,6 +16,24 @@
       "pattern": "Google-Gemini-CLI",
       "name": "Gemini CLI",
       "company": "Google",
+      "category": "agent"
+    },
+    {
+      "pattern": "Claude-User",
+      "name": "Claude Code",
+      "company": "Anthropic",
+      "category": "agent"
+    },
+    {
+      "pattern": "Kiro-CLI",
+      "name": "Kiro",
+      "company": "Amazon",
+      "category": "agent"
+    },
+    {
+      "pattern": "ModelContextProtocol",
+      "name": "MCP Client",
+      "company": null,
       "category": "agent"
     },
 
@@ -70,6 +89,12 @@
     {
       "pattern": "Google-CloudVertexBot",
       "name": "Google-CloudVertexBot",
+      "company": "Google",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "GoogleAgent-URLContext",
+      "name": "GoogleAgent-URLContext",
       "company": "Google",
       "category": "ai-assistant"
     },
@@ -130,6 +155,13 @@
       "category": "ai-crawler"
     },
     { "pattern": "Timpibot", "name": "Timpibot", "company": "Timpi", "category": "ai-search" },
+    {
+      "pattern": "JarvisSearch",
+      "name": "JarvisSearch",
+      "company": null,
+      "category": "ai-search"
+    },
+    { "pattern": "kagibot", "name": "Kagibot", "company": "Kagi", "category": "ai-search" },
 
     {
       "pattern": "Googlebot",
@@ -229,6 +261,193 @@
       "name": "Discordbot",
       "company": "Discord",
       "category": "social-preview"
+    },
+    {
+      "pattern": "Mastodon/",
+      "name": "Mastodon",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Lemmy/",
+      "name": "Lemmy",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "WhatsApp/",
+      "name": "WhatsApp",
+      "company": "Meta",
+      "category": "social-preview"
+    },
+
+    {
+      "pattern": "HackerNews/",
+      "name": "HackerNews App",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "SpaceCowboys",
+      "name": "SpaceCowboys",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "FreshRSS/",
+      "name": "FreshRSS",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "NextCloud-News",
+      "name": "NextCloud-News",
+      "company": "Nextcloud",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Miniflux/",
+      "name": "Miniflux",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Feedbin/",
+      "name": "Feedbin",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "NewsBlur",
+      "name": "NewsBlur",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Feedly/",
+      "name": "Feedly",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "TechFeed/",
+      "name": "TechFeed",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Aggregator/",
+      "name": "Aggregator",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Aruvi/",
+      "name": "Aruvi",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "SuperHN/",
+      "name": "SuperHN",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "news_fetcher/",
+      "name": "news_fetcher",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "FlipboardProxy",
+      "name": "Flipboard",
+      "company": "Flipboard",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Flipboard",
+      "name": "Flipboard",
+      "company": "Flipboard",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "ReadYou/",
+      "name": "ReadYou",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Newsly/",
+      "name": "Newsly",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "NewsFlash",
+      "name": "NewsFlash",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "feedi/",
+      "name": "feedi",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "EmergentNews",
+      "name": "EmergentNews",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "RSSReader",
+      "name": "RSSReader",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "mychat-constructor-fetch-rss",
+      "name": "mychat-constructor-fetch-rss",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "FeedBurner",
+      "name": "FeedBurner",
+      "company": "Google",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Feedspot",
+      "name": "Feedspot",
+      "company": "Feedspot",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "News Explorer",
+      "name": "News Explorer",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "SiftRSS",
+      "name": "SiftRSS",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Juoruankka",
+      "name": "Juoruankka",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "SecondBrain",
+      "name": "SecondBrain",
+      "company": null,
+      "category": "feed-reader"
     }
   ]
 }

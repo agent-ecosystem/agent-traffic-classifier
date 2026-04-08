@@ -6,11 +6,14 @@ Classify web server traffic into humans, bots, AI agents, and programmatic clien
 
 Given access log entries (and optionally HTTP header signals), the library:
 
-1. **Classifies** each request by user-agent into a category: human, AI crawler, AI assistant, AI search, coding agent, search crawler, SEO bot, monitoring, social preview, programmatic client, or unknown
-2. **Detects AI agents** that use standard browser user-agents (Claude Code, Cursor, Gemini CLI) via HTTP header heuristics and signal attribution
-3. **Clusters sessions** by correlating signal data with access logs to reclassify traffic that would otherwise look human
-4. **Detects proxy-based agents** (like Cursor) via a duplicate-request heuristic: same path + UA from different IPs within a short window
-5. **Aggregates** classified entries into daily summary documents with category breakdowns, top paths, referrers, bot/agent/programmatic stats, and status codes
+1. **Classifies** each request by user-agent into a category: human, AI crawler, AI assistant, AI search, coding agent, search crawler, SEO bot, monitoring, social preview, feed reader, programmatic client, or unknown
+2. **Detects AI agents** that use standard browser user-agents (Claude Code, Cursor, Kiro, Gemini CLI) via HTTP header heuristics and signal attribution
+3. **Identifies agent frameworks** by Accept header patterns, missing browser security headers, and conversation-tracking headers, even when the specific agent is unknown
+4. **Attributes country-level intelligence** to unidentified agents using IP ranges from Regional Internet Registries, enabling suspected identification (e.g., "Kimi / Doubao / DeepSeek (suspected)" for Chinese AI assistants)
+5. **Clusters sessions** by correlating signal data with access logs to reclassify traffic that would otherwise look human
+6. **Cross-references programmatic traffic** with signal data to upgrade HTTP client requests (httpx, undici, etc.) to agent when they share IPs with known agent signals
+7. **Detects proxy-based agents** (like Cursor) via a duplicate-request heuristic: same path + UA from different IPs within a short window
+8. **Aggregates** classified entries into daily summary documents with category breakdowns, top paths, referrers, bot/agent/programmatic stats, and status codes
 
 ## Install
 
@@ -27,7 +30,6 @@ The simplest usage: parse Apache access logs, classify, and aggregate.
 ```ts
 import {
   parseLine,
-  parseApacheTzOffset,
   createClassifier,
   createFilter,
   reclassifyEntries,
@@ -60,9 +62,9 @@ const docs = aggregate(classified, {
 // docs[0].summary.byCategory => { human: {...}, 'ai-crawler': {...}, programmatic: {...} }
 ```
 
-### With signal data
+### With signal data and IP intelligence
 
-For deeper agent detection, capture HTTP headers from requests that exhibit agent-like behavior (content negotiation, `llms.txt` requests, etc.) and feed them as signal entries. This lets the library identify agents that use standard browser user-agents.
+For deeper agent detection, capture HTTP headers from requests that exhibit agent-like behavior (content negotiation, `llms.txt` requests, etc.) and feed them as signal entries. Combined with IP intelligence, this lets the library identify agents that use standard browser user-agents and attribute unidentified traffic to suspected services.
 
 ```ts
 import {
@@ -70,16 +72,33 @@ import {
   createClassifier,
   createFilter,
   createSignalClassifier,
+  createCountryLookup,
+  createCloudProviderLookup,
   buildAgentSeeds,
   reclassifyEntries,
   detectDuplicateRequestAgents,
+  crossReferenceSignalIps,
   aggregate,
 } from 'agent-traffic-classifier';
 import type { LogEntry, SignalEntry } from 'agent-traffic-classifier';
 
 const classify = createClassifier();
 const shouldSkip = createFilter();
-const { classifySignalEntry, getSignalSummary } = createSignalClassifier();
+
+// Initialize IP intelligence (async, fetches public range data once)
+const countryLookup = await createCountryLookup(['CN']); // Only fetch ranges for countries you need
+const cloudLookup = await createCloudProviderLookup(); // Google, AWS, Cloudflare ranges
+
+const { classifySignalEntry, getSignalSummary } = createSignalClassifier({
+  ipLookup: (ip) => {
+    const info: Record<string, string> = {};
+    const country = countryLookup(ip);
+    if (country) info.country = country;
+    const provider = cloudLookup(ip);
+    if (provider) info.cloudProvider = provider;
+    return info;
+  },
+});
 
 // Parse access log entries
 const entries: LogEntry[] = logLines.map((line) => parseLine(line)).filter((e) => e !== null);
@@ -103,8 +122,16 @@ const classified = reclassifyEntries(entries, domainSeeds, classify);
 // Detect proxy-based agents (e.g., Cursor's duplicate-request pattern)
 const withDuplicates = detectDuplicateRequestAgents(classified);
 
+// Upgrade programmatic clients that share IPs with known agent signals
+const withCrossRef = crossReferenceSignalIps(
+  withDuplicates,
+  signalEntries,
+  'example.com',
+  classifySignalEntry,
+);
+
 // Aggregate with signal summary
-const docs = aggregate(withDuplicates, {
+const docs = aggregate(withCrossRef, {
   domain: 'example.com',
   tzOffsetMinutes: -420,
   shouldSkip,
@@ -141,19 +168,70 @@ Every request is classified into one of these categories:
 | Category         | Description                                                                               |
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | `human`          | Regular browser traffic                                                                   |
+| `agent`          | AI coding agents (Claude Code, Cursor, Kiro, GitHub Copilot, Gemini CLI, MCP clients)     |
 | `ai-crawler`     | AI training data crawlers (GPTBot, ClaudeBot, etc.)                                       |
-| `ai-assistant`   | AI assistants fetching live content (ChatGPT-User, Claude-Web)                            |
-| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot)                                  |
-| `agent`          | AI coding agents (Claude Code, Cursor, GitHub Copilot, Gemini CLI)                        |
+| `ai-assistant`   | AI assistants fetching live content (ChatGPT-User, GoogleAgent-URLContext)                |
+| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot, Kagibot)                         |
 | `search-crawler` | Traditional search engines (Googlebot, Bingbot)                                           |
 | `seo-bot`        | SEO/marketing bots (AhrefsBot, SemrushBot)                                                |
 | `monitoring`     | Uptime monitors (UptimeRobot, Pingdom)                                                    |
-| `social-preview` | Link preview fetchers (Twitterbot, Slackbot)                                              |
-| `programmatic`   | HTTP clients (curl, axios, python-requests)                                               |
+| `social-preview` | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                          |
+| `feed-reader`    | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                             |
+| `programmatic`   | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                           |
 | `other-bot`      | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list |
 | `unknown`        | Empty or missing user-agent                                                               |
 
 Classification priority: curated bot list > programmatic client heuristic > isbot fallback > human.
+
+## Signal heuristics
+
+When HTTP header signals are available, the library applies a chain of heuristics to identify agents that use standard browser user-agents. The chain is ordered by specificity (first match wins):
+
+1. **Known agent UAs**: Claude Code (`Claude-User`), Gemini CLI (`Google-Gemini-CLI`), markdown.new
+2. **Dev tool exclusion**: curl and other known developer tools are excluded from agent classification
+3. **Chrome 122 / macOS 14.7.2**: Frozen browser fingerprint used by Chinese AI assistant services. With CN country IP, returns "Kimi / Doubao / DeepSeek (suspected)"
+4. **Cursor (Traceparent)**: Generic Chrome UA with OpenTelemetry tracing headers, excluding VS Code
+5. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
+6. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
+7. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, markdown variants)
+8. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
+9. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
+
+All heuristics are exported individually so you can reorder, replace, or extend the chain.
+
+## IP intelligence
+
+The library includes adapters for IP-to-country and IP-to-cloud-provider lookups. These are optional, async-init, sync-lookup: you call the async factory once at startup, and it returns a synchronous lookup function.
+
+```ts
+import {
+  createCountryLookup,
+  createCloudProviderLookup,
+  createIpLookup,
+  buildCidrIndex,
+} from 'agent-traffic-classifier';
+
+// Country lookup from RIR delegation data (fetches from APNIC, RIPE, etc.)
+const countryLookup = await createCountryLookup(['CN', 'RU']);
+
+// Cloud provider lookup (fetches published ranges from Google, AWS, Cloudflare)
+const cloudLookup = await createCloudProviderLookup();
+
+// Combined convenience factory
+const ipLookup = await createIpLookup({
+  countries: ['CN'],
+  cloudProviders: true,
+});
+
+// Or build your own CIDR index for custom ranges
+const customIndex = buildCidrIndex([
+  { cidr: '10.0.0.0/8', tag: 'internal' },
+  { cidr: '172.16.0.0/12', tag: 'internal' },
+]);
+const tag = customIndex('10.1.2.3'); // => 'internal'
+```
+
+The `IpLookup` interface (`(ip: string) => IpInfo`) can be implemented with any data source. The built-in adapters are convenience layers; pass your own function if you have a different IP intelligence source.
 
 ## Configuration
 
@@ -177,6 +255,8 @@ const classify = createClassifier({
 
 ### Filter
 
+The filter determines which requests are counted in aggregation. Requests matching skip patterns are excluded from all stats (category counts, top paths, referrers, status codes).
+
 ```ts
 import { createFilter, DEFAULT_SKIP_PATHS } from 'agent-traffic-classifier';
 
@@ -197,7 +277,6 @@ import {
   createSignalClassifier,
   DEFAULT_KNOWN_AGENTS,
   DEFAULT_HEURISTICS,
-  cursorHeuristic,
 } from 'agent-traffic-classifier';
 
 const { classifySignalEntry, getSignalSummary } = createSignalClassifier({
@@ -205,7 +284,7 @@ const { classifySignalEntry, getSignalSummary } = createSignalClassifier({
   knownAgents: [{ pattern: 'MyAgent', name: 'My Agent', company: 'Me' }, ...DEFAULT_KNOWN_AGENTS],
   // Add a custom header-based heuristic
   heuristics: [
-    (entry) => {
+    (entry, ipInfo) => {
       if (entry.headers?.['X-My-Agent']) {
         return { isAgent: true, name: 'MyAgent', company: 'Me' };
       }
@@ -213,6 +292,8 @@ const { classifySignalEntry, getSignalSummary } = createSignalClassifier({
     },
     ...DEFAULT_HEURISTICS,
   ],
+  // Optional IP intelligence for country/cloud attribution
+  ipLookup: (ip) => ({ country: 'US' }),
 });
 ```
 
@@ -241,6 +322,7 @@ import { aggregate } from 'agent-traffic-classifier';
 const docs = aggregate(classified, {
   domain: 'example.com',
   tzOffsetMinutes: -420,
+  shouldSkip, // Entries matching this filter are excluded from all stats
   topPathsLimit: 100, // Max top paths per day (default: 50)
   topItemPathsLimit: 20, // Max top paths per bot/agent (default: 10)
   topReferrersLimit: 50, // Max referrers per day (default: 30)
@@ -258,10 +340,10 @@ const docs = aggregate(classified, {
 ### Adapters
 
 - **`parseLine(line)`** -- Parse an Apache Combined Log Format line into a `LogEntry`
-- **`readLogFiles(dir, pattern?)`** -- Read and parse `.log` and `.log.gz` files from a directory
+- **`readLogFiles(dir)`** -- Read and parse `.log` and `.log.gz` files from a directory
 - **`parseApacheTs(raw)`** -- Convert an Apache timestamp string to Unix epoch seconds
 - **`parseApacheTzOffset(raw)`** -- Extract timezone offset in minutes from an Apache timestamp
-- **`parseSignalLog(content)`** -- Parse JSONL signal log content into `SignalEntry[]`
+- **`parseSignalLog(dir)`** -- Parse JSONL signal log files from a directory into `SignalEntry[]`
 
 ### Core
 
@@ -274,6 +356,15 @@ const docs = aggregate(classified, {
 - **`buildAgentSeeds(signalEntries, classifySignalEntry)`** -- Build agent seeds grouped by domain
 - **`reclassifyEntries(entries, domainSeeds, classifyFn, options?)`** -- Reclassify access log entries using signal seeds
 - **`detectDuplicateRequestAgents(entries, options?)`** -- Detect proxy-based agents via duplicate-request heuristic
+- **`crossReferenceSignalIps(entries, signalEntries, domain, classifySignalEntry)`** -- Upgrade programmatic entries to agent when their IP appears in signal data
+
+### IP intelligence
+
+- **`createIpLookup(options?)`** -- Combined country + cloud provider lookup factory
+- **`createCountryLookup(countries)`** -- Country lookup from RIR delegation data
+- **`createCloudProviderLookup(options?)`** -- Cloud provider lookup from published ranges
+- **`buildCidrIndex(entries)`** -- Build a CIDR lookup index from custom ranges
+- **`parseIpv4(ip)`**, **`parseCidr(cidr)`**, **`matchesCidr(ip, cidr)`** -- Low-level IPv4 utilities
 
 ### Aggregation
 
@@ -297,7 +388,15 @@ import {
   DEFAULT_DEV_TOOLS,
   DEFAULT_AGENT_TRIGGERS,
   DEFAULT_HEURISTICS,
+  SUSPECTED_AGENTS,
+  DEFAULT_ACCEPT_TAXONOMY,
+  // Individual heuristics
   cursorHeuristic,
+  chrome122Heuristic,
+  conversationTrackingHeuristic,
+  markdownMimeHeuristic,
+  acceptTaxonomyHeuristic,
+  missingBrowserHeadersHeuristic,
   // Skip patterns
   DEFAULT_SKIP_EXTENSIONS,
   DEFAULT_SKIP_PATHS,
@@ -312,6 +411,7 @@ import {
   // Category constants
   CATEGORY_HUMAN,
   CATEGORY_AGENT,
+  CATEGORY_FEED_READER,
   CATEGORY_PROGRAMMATIC,
   CATEGORY_OTHER_BOT,
   CATEGORY_UNKNOWN,

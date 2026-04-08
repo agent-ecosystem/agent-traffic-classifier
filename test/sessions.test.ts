@@ -3,6 +3,7 @@ import {
   buildAgentSeeds,
   reclassifyEntries,
   detectDuplicateRequestAgents,
+  crossReferenceSignalIps,
 } from '../src/sessions.js';
 import { createSignalClassifier } from '../src/signals.js';
 import { createClassifier } from '../src/classify.js';
@@ -96,20 +97,29 @@ describe('reclassifyEntries', () => {
   });
 
   it('does not reclassify entries outside the time window', () => {
-    const signalEntries = [makeSignalEntry({ timestamp: toEpoch('2026-04-04T07:36:43Z') })];
-    const seeds = buildAgentSeeds(signalEntries, classifySignalEntry);
+    // Use a custom signal classifier that recognizes "TestAgent/1.0"
+    const { classifySignalEntry: testClassify } = createSignalClassifier({
+      knownAgents: [{ pattern: 'TestAgent', name: 'TestAgent', company: 'Test' }],
+    });
+    const signalEntries = [
+      makeSignalEntry({
+        timestamp: toEpoch('2026-04-04T07:36:43Z'),
+        headers: { 'User-Agent': 'TestAgent/1.0' },
+      }),
+    ];
+    const seeds = buildAgentSeeds(signalEntries, testClassify);
     const domainSeeds = seeds.get('example.com')!;
 
-    // Entry is 2 hours later than the signal
+    // Entry is 2 hours later than the signal — outside the default window
     const logEntries = [
       makeLogEntry({
         timestamp: toEpoch('2026-04-04T09:36:43Z'),
-        userAgent: 'Claude-User/1.0',
+        userAgent: 'TestAgent/1.0',
       }),
     ];
     const result = reclassifyEntries(logEntries, domainSeeds, classify);
     // Outside the window, so falls through to base classification.
-    // "Claude-User" is not in the bot DB (only in signal patterns), so isbot catches it.
+    // "TestAgent" is not in the bot DB, so it goes to isbot or human.
     expect(result[0].classification.category).not.toBe('agent');
   });
 
@@ -317,5 +327,146 @@ describe('detectDuplicateRequestAgents', () => {
     );
     expect(agentEntry!.classification.botName).toBe('Windsurf (suspected)');
     expect(agentEntry!.classification.botCompany).toBe('Codeium');
+  });
+});
+
+describe('crossReferenceSignalIps', () => {
+  const classifyAsAgent = (_entry: SignalEntry) => ({
+    isAgent: true as const,
+    name: 'Claude Code',
+    company: 'Anthropic' as string | null,
+  });
+
+  const classifyAsNotAgent = (_entry: SignalEntry) => ({
+    isAgent: false as const,
+  });
+
+  it('upgrades programmatic entry to agent when IP matches signal data', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' })];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsAgent);
+    expect(result[0].classification.category).toBe('agent');
+    expect(result[0].classification.botName).toBe('Claude Code');
+    expect(result[0].classification.botCompany).toBe('Anthropic');
+  });
+
+  it('does not upgrade when IP does not match signal data', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [makeSignalEntry({ ip: '9.9.9.9', domain: 'example.com' })];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsAgent);
+    expect(result[0].classification.category).toBe('programmatic');
+  });
+
+  it('does not upgrade when signal is for a different domain', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [makeSignalEntry({ ip: '1.2.3.4', domain: 'other.com' })];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsAgent);
+    expect(result[0].classification.category).toBe('programmatic');
+  });
+
+  it('does not upgrade non-programmatic entries', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const signals = [makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' })];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsAgent);
+    expect(result[0].classification.category).toBe('human');
+  });
+
+  it('does not upgrade when signal entry is not classified as agent', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' })];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsNotAgent);
+    expect(result[0].classification.category).toBe('programmatic');
+  });
+
+  it('prefers named agents over unidentified', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [
+      makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' }),
+      makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' }),
+    ];
+
+    let callCount = 0;
+    const classifier = (_entry: SignalEntry) => {
+      callCount++;
+      if (callCount === 1) return { isAgent: true as const, name: undefined, company: null };
+      return { isAgent: true as const, name: 'Claude Code', company: 'Anthropic' as string | null };
+    };
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifier);
+    expect(result[0].classification.botName).toBe('Claude Code');
+  });
+
+  it('returns original array reference when no signal IPs match agents', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' })];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsNotAgent);
+    expect(result).toBe(entries);
+  });
+
+  it('handles multiple entries with different IPs', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.2.3.4', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '5.6.7.8', userAgent: 'undici' }),
+        classification: { category: 'programmatic', botName: 'undici', botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '9.9.9.9', userAgent: 'python-httpx/0.27' }),
+        classification: { category: 'programmatic', botName: 'httpx', botCompany: null },
+      },
+    ];
+    const signals = [
+      makeSignalEntry({ ip: '1.2.3.4', domain: 'example.com' }),
+      makeSignalEntry({ ip: '9.9.9.9', domain: 'example.com' }),
+    ];
+
+    const result = crossReferenceSignalIps(entries, signals, 'example.com', classifyAsAgent);
+    expect(result[0].classification.category).toBe('agent');
+    expect(result[1].classification.category).toBe('programmatic'); // no signal match
+    expect(result[2].classification.category).toBe('agent');
   });
 });

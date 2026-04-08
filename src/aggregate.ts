@@ -119,9 +119,16 @@ export function aggregate(entries: ClassifiedEntry[], options: AggregateOptions)
       }
     > = {};
 
+    let totalRequests = 0;
+
     for (const { entry, classification } of dayEntries) {
       // Skip proxy duplicate entries
       if (classification.proxyDuplicate) continue;
+
+      // Skip non-content requests (static assets, scanner probes, etc.)
+      if (shouldSkip && shouldSkip(entry)) continue;
+
+      totalRequests++;
 
       const { category, botName, botCompany } = classification;
       const { path: normalizedPath, utmSource } = normalizePathFn(entry.path);
@@ -133,11 +140,8 @@ export function aggregate(entries: ClassifiedEntry[], options: AggregateOptions)
       categoryStats[category].requests++;
       categoryStats[category].ips.add(entry.ip);
 
-      // Determine if this is a content page
-      const isContentPage = shouldSkip ? !shouldSkip(entry) : true;
-
-      // Top paths (human + AI traffic, skip configured categories; filter static assets)
-      if (isContentPage && !skipCategoriesSet.has(category)) {
+      // Top paths (human + AI traffic, skip configured categories)
+      if (!skipCategoriesSet.has(category)) {
         if (!pathStats[normalizedPath]) {
           pathStats[normalizedPath] = { count: 0, ips: new Set() };
         }
@@ -145,8 +149,8 @@ export function aggregate(entries: ClassifiedEntry[], options: AggregateOptions)
         pathStats[normalizedPath].ips.add(entry.ip);
       }
 
-      // Referrers (human traffic only, content pages only)
-      if (isContentPage && category === CATEGORY_HUMAN) {
+      // Referrers (human traffic only)
+      if (category === CATEGORY_HUMAN) {
         if (utmSource) {
           referrerStats[utmSource] = (referrerStats[utmSource] || 0) + 1;
         }
@@ -172,10 +176,8 @@ export function aggregate(entries: ClassifiedEntry[], options: AggregateOptions)
         }
         botStats[botName].requests++;
         botStats[botName].ips.add(entry.ip);
-        if (isContentPage) {
-          botStats[botName].paths[normalizedPath] =
-            (botStats[botName].paths[normalizedPath] || 0) + 1;
-        }
+        botStats[botName].paths[normalizedPath] =
+          (botStats[botName].paths[normalizedPath] || 0) + 1;
       }
 
       // Programmatic client breakdown
@@ -200,10 +202,8 @@ export function aggregate(entries: ClassifiedEntry[], options: AggregateOptions)
         }
         agentStats[botName].requests++;
         agentStats[botName].ips.add(entry.ip);
-        if (isContentPage) {
-          agentStats[botName].paths[normalizedPath] =
-            (agentStats[botName].paths[normalizedPath] || 0) + 1;
-        }
+        agentStats[botName].paths[normalizedPath] =
+          (agentStats[botName].paths[normalizedPath] || 0) + 1;
       }
     }
 
@@ -272,7 +272,7 @@ export function aggregate(entries: ClassifiedEntry[], options: AggregateOptions)
       date: dateKey,
       domain,
       summary: {
-        totalRequests: dayEntries.length,
+        totalRequests,
         byCategory,
       },
       topPaths,

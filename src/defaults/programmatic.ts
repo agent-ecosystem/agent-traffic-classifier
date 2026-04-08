@@ -18,6 +18,10 @@ export const DEFAULT_PROGRAMMATIC: string[] = [
   'okhttp',
   'Ruby',
   'colly',
+  'newspaper',
+  'undici',
+  'trafilatura',
+  'http.rb',
 ];
 
 /**
