@@ -41,6 +41,7 @@
     "user-agent",
     "agent traffic"
   ],
+  "author": "Dachary Carey",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -54,8 +55,7 @@
     "node": ">=22"
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "dependencies": {
     "isbot": "^5.1.37"
