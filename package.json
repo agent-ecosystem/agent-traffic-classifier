@@ -38,11 +38,20 @@
     "web-analytics",
     "access-log",
     "crawler",
-    "user-agent"
+    "user-agent",
+    "agent traffic"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agent-ecosystem/agent-traffic-classifier.git"
+  },
+  "bugs": {
+    "url": "https://github.com/agent-ecosystem/agent-traffic-classifier/issues"
+  },
+  "homepage": "https://github.com/agent-ecosystem/agent-traffic-classifier",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "files": [
     "dist",
