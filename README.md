@@ -1,6 +1,14 @@
+<p align="center">
+  <a href="https://github.com/agent-ecosystem/agent-traffic-classifier/actions/workflows/ci.yml"><img src="https://github.com/agent-ecosystem/agent-traffic-classifier/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/agent-traffic-classifier"><img src="https://img.shields.io/npm/v/agent-traffic-classifier" alt="npm"></a>
+</p>
+
 # agent-traffic-classifier
 
 Classify web server traffic into humans, bots, AI agents, and programmatic clients. Built for analyzing access logs and HTTP header signals to understand how AI agents interact with your site.
+
+> **Status: Early development (0.x)**
+> This library is currently in early iteration and does not promise stability guarantees.
 
 ## What it does
 
