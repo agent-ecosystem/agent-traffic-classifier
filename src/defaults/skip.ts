@@ -11,32 +11,21 @@
  * want to extend rather than replace:
  *
  * ```ts
- * import { createFilter, DEFAULT_SKIP_EXTENSIONS, DEFAULT_SKIP_PATHS } from 'agent-traffic-classifier';
+ * import { createFilter, DEFAULT_SKIP_SUBSTRINGS } from 'agent-traffic-classifier';
  *
  * const shouldSkip = createFilter({
- *   // Add .md to the default extension filter
- *   skipExtensions: /\.(js|css|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif|json|xml|md)$/i,
- *   // Extend default paths with site-specific ones
- *   skipPaths: [...DEFAULT_SKIP_PATHS, '/internal-tool/'],
- *   // Add custom substring patterns (no defaults shipped)
- *   skipSubstrings: ['-nonexistent-'],
- *   // Add per-site paths (no defaults shipped)
- *   siteSkipPaths: ['/staging/'],
+ *   // Extend default substrings with site-specific ones
+ *   skipSubstrings: [...DEFAULT_SKIP_SUBSTRINGS, '-staging-'],
  * });
  * ```
  */
 
 /** Static asset and scanner probe file extensions. */
 export const DEFAULT_SKIP_EXTENSIONS =
-  /\.(js|css|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif|json|xml|php)$/i;
+  /\.(js|css|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif|json|xml|php|sql|bak|log|key|pem)$/i;
 
-/** Exact paths: favicons, manifests, discovery files, and common scanner probes. */
+/** Exact paths: favicons, manifests, discovery files. */
 export const DEFAULT_SKIP_PATHS: string[] = [
-  // WordPress probes (scanners hit these on every server)
-  '/xmlrpc.php',
-  '/wp-login.php',
-  '/wp-cron.php',
-  '/index.php',
   // Favicons and app icons
   '/favicon.ico',
   '/favicon.png',
@@ -55,19 +44,16 @@ export const DEFAULT_SKIP_PATHS: string[] = [
   '/ads.txt',
   '/app-ads.txt',
   '/style.css',
-  // Dotfiles (vulnerability scanners)
-  '/.env',
-  '/.git',
   // RSS/Atom feeds
   '/feed/',
   // Debug/actuator probes (Spring Boot, etc.)
   '/actuator/',
   '/debug/',
-  // Admin panels (vulnerability scanners, not real content)
+  // Admin panels
   '/admin',
 ];
 
-/** Path prefixes: static asset directories and common scanner targets. */
+/** Path prefixes: static asset directories. */
 export const DEFAULT_SKIP_PREFIXES: string[] = [
   '/js/',
   '/css/',
@@ -77,18 +63,46 @@ export const DEFAULT_SKIP_PREFIXES: string[] = [
   '/avatars/',
   '/images/',
   '/static/',
-  // WordPress paths (scanners probe these everywhere)
-  '/wp-admin/',
-  '/wp-includes/',
-  '/wp-content/',
-  '/wordpress/',
   // Well-known discovery paths
   '/.well-known/',
-  // Vulnerability scanner probes
-  '//', // Double-slash (malformed URLs)
-  '/@fs/', // Vite dev server path traversal exploit
-  '/etc/', // Unix path traversal
-  '/cmd_', // Command execution probes (cmd_sco, etc.)
+  // Malformed URLs (always scanner noise)
+  '//', // Double-slash
   '/https%3A', // URL-encoded redirect probes
   '/http%3A',
+];
+
+/**
+ * Substring patterns: matched anywhere in the path via `includes()`.
+ *
+ * This is the primary defense against vulnerability scanners. Scanners try every
+ * prefix variant (/wp/wp-admin/, /new/wp-admin/, /blog/wp-admin/), so substring
+ * matching catches them all at once without enumerating prefixes.
+ */
+export const DEFAULT_SKIP_SUBSTRINGS: string[] = [
+  // WordPress probes (scanners try every prefix variant)
+  'wp-admin',
+  'wp-login',
+  'wp-config',
+  'xmlrpc',
+  'wp-includes',
+  'wp-content',
+  // PHP probes
+  'phpinfo',
+  'phpmyadmin',
+  '/pma/',
+  // Credential and config file probes
+  '.env',
+  '.git/',
+  '.ssh/',
+  '.aws/',
+  '.docker',
+  'docker-compose',
+  // Path traversal
+  '/etc/passwd',
+  '/@fs/',
+  // Framework debug/admin probes
+  '_profiler',
+  '_environment',
+  '/webroot/',
+  '/cmd_',
 ];

@@ -266,17 +266,17 @@ const classify = createClassifier({
 The filter determines which requests are counted in aggregation. Requests matching skip patterns are excluded from all stats (category counts, top paths, referrers, status codes).
 
 ```ts
-import { createFilter, DEFAULT_SKIP_PATHS } from 'agent-traffic-classifier';
+import { createFilter, DEFAULT_SKIP_SUBSTRINGS } from 'agent-traffic-classifier';
 
 const shouldSkip = createFilter({
-  // Extend default paths
-  skipPaths: [...DEFAULT_SKIP_PATHS, '/internal/'],
-  // Add custom substring matches (empty by default)
-  skipSubstrings: ['-staging-'],
+  // Extend default substrings with site-specific patterns
+  skipSubstrings: [...DEFAULT_SKIP_SUBSTRINGS, '-staging-'],
   // Per-site paths (empty by default)
   siteSkipPaths: ['/old-section/'],
 });
 ```
+
+The default substrings cover common vulnerability scanner probes (`wp-admin`, `phpinfo`, `.git/`, `.ssh/`, `.aws/`, `xmlrpc`, `_profiler`, etc.) using substring matching, so they catch all prefix variants at once (e.g., `/wp/wp-admin/`, `/blog/wp-admin/`, `/old/wp-admin/`).
 
 ### Signal classifier
 
@@ -409,6 +409,7 @@ import {
   DEFAULT_SKIP_EXTENSIONS,
   DEFAULT_SKIP_PATHS,
   DEFAULT_SKIP_PREFIXES,
+  DEFAULT_SKIP_SUBSTRINGS,
   // Session config
   DEFAULT_WINDOW_SECONDS,
   DEFAULT_PROXY_WINDOW_SECONDS,
