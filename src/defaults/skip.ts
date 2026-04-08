@@ -26,9 +26,9 @@
  * ```
  */
 
-/** Static asset file extensions. */
+/** Static asset and scanner probe file extensions. */
 export const DEFAULT_SKIP_EXTENSIONS =
-  /\.(js|css|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif|json|xml)$/i;
+  /\.(js|css|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif|json|xml|php)$/i;
 
 /** Exact paths: favicons, manifests, discovery files, and common scanner probes. */
 export const DEFAULT_SKIP_PATHS: string[] = [
@@ -84,4 +84,11 @@ export const DEFAULT_SKIP_PREFIXES: string[] = [
   '/wordpress/',
   // Well-known discovery paths
   '/.well-known/',
+  // Vulnerability scanner probes
+  '//', // Double-slash (malformed URLs)
+  '/@fs/', // Vite dev server path traversal exploit
+  '/etc/', // Unix path traversal
+  '/cmd_', // Command execution probes (cmd_sco, etc.)
+  '/https%3A', // URL-encoded redirect probes
+  '/http%3A',
 ];
