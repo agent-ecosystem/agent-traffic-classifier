@@ -4,6 +4,7 @@ import type {
   ClassifyResult,
   LogEntry,
   SessionOptions,
+  SessionProfile,
   SignalClassifyResult,
   SignalEntry,
 } from './types.js';
@@ -18,6 +19,49 @@ import {
   CATEGORY_PROGRAMMATIC,
   UNIDENTIFIED_AGENT,
 } from './defaults/categories.js';
+
+/** Extensions that indicate static asset requests (images, scripts, styles, fonts). */
+const STATIC_ASSET_RE = /\.(css|js|mjs|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot)(\?|$)/i;
+
+/**
+ * Build per-IP session profiles from access log entries.
+ *
+ * For each IP, determines whether the session includes static asset fetches
+ * (CSS, JS, images, fonts) and self-site referrers (referrers pointing to
+ * the same domain). Both are strong indicators of a real browser session.
+ *
+ * Pass the result into `SessionOptions.sessionProfiles` to suppress
+ * false-positive "Cursor (suspected)" labels during high-traffic periods.
+ */
+export function buildSessionProfiles(
+  entries: ClassifiedEntry[],
+  domain: string,
+): Map<string, SessionProfile> {
+  const profiles = new Map<string, SessionProfile>();
+
+  for (const { entry } of entries) {
+    let profile = profiles.get(entry.ip);
+    if (!profile) {
+      profile = { hasStaticAssets: false, hasSelfReferrer: false };
+      profiles.set(entry.ip, profile);
+    }
+
+    if (!profile.hasStaticAssets && STATIC_ASSET_RE.test(entry.path)) {
+      profile.hasStaticAssets = true;
+    }
+
+    if (
+      !profile.hasSelfReferrer &&
+      entry.referrer &&
+      entry.referrer !== '-' &&
+      entry.referrer.includes(domain)
+    ) {
+      profile.hasSelfReferrer = true;
+    }
+  }
+
+  return profiles;
+}
 
 /**
  * Build agent seeds from signal entries, grouped by domain.
@@ -139,6 +183,7 @@ export function detectDuplicateRequestAgents(
   const proxyWindowSeconds = options?.proxyWindowSeconds ?? DEFAULT_PROXY_WINDOW_SECONDS;
   const proxyAgent = options?.proxyAgent ?? CURSOR_PROXY_AGENT;
   const proxyBotNames = new Set([UNIDENTIFIED_AGENT, proxyAgent.name, proxyAgent.suspectedName]);
+  const sessionProfiles = options?.sessionProfiles;
 
   // Group ALL entries by (path, userAgent)
   const groups = new Map<string, number[]>();
@@ -224,7 +269,22 @@ export function detectDuplicateRequestAgents(
       primaryIdx = nameA ? idxA : idxB;
       duplicateIdx = nameA ? idxB : idxA;
     } else {
-      // No signal data; heuristic only = suspected
+      // No signal data; heuristic only = suspected.
+      // Session-aware gate: if both IPs show real-browser behavior (static
+      // asset fetches AND self-site referrers), this pair is likely
+      // coincidental concurrent human access, not a proxy-based agent.
+      if (sessionProfiles) {
+        const profA = sessionProfiles.get(result[idxA].entry.ip);
+        const profB = sessionProfiles.get(result[idxB].entry.ip);
+        if (
+          profA?.hasStaticAssets &&
+          profA?.hasSelfReferrer &&
+          profB?.hasStaticAssets &&
+          profB?.hasSelfReferrer
+        ) {
+          continue;
+        }
+      }
       agentName = proxyAgent.suspectedName;
       agentCompany = proxyAgent.company;
       primaryIdx = idxA;

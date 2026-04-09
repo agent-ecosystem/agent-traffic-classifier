@@ -4,6 +4,7 @@ import { CURSOR_PROXY_AGENT } from './sessions.js';
 /** Known agent UA patterns for signal classification. */
 export const DEFAULT_KNOWN_AGENTS: Array<{ pattern: string; name: string; company: string }> = [
   { pattern: 'Claude-User', name: 'Claude Code', company: 'Anthropic' },
+  { pattern: 'Claude-Agent', name: 'Claude Agent', company: 'Anthropic' },
   { pattern: 'Google-Gemini-CLI', name: 'Gemini CLI', company: 'Google' },
   { pattern: 'markdown.new', name: 'markdown.new', company: 'markdown.new' },
 ];
@@ -47,6 +48,14 @@ export const DEFAULT_ACCEPT_TAXONOMY: AcceptPattern[] = [
   { prefix: 'text/plain;q=1.0,text/markdown', name: 'text-first agent' },
   // axios-based pattern (same as Claude Code WebFetch, but from non-Claude UAs)
   { prefix: 'text/markdown,text/html,*/*', name: 'axios-pattern agent' },
+  // Cursor Accept pattern: full browser-like preference list with markdown first
+  {
+    prefix:
+      'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+    name: 'Cursor (suspected)',
+  },
+  // got library: markdown + plain text preference
+  { prefix: 'text/markdown,text/plain;q=0.9,*/*;q=0.8', name: 'got-pattern agent' },
   // Variant with q=0.8 for wildcard (different from Chrome 122's q=0.1)
   { prefix: 'text/markdown,text/html;q=0.9,*/*;q=0.8', name: 'markdown agent' },
   // Minimal: markdown + html preference without wildcard
@@ -59,6 +68,22 @@ export const DEFAULT_ACCEPT_TAXONOMY: AcceptPattern[] = [
 function normalizeAccept(accept: string): string {
   return accept.replace(/,\s+/g, ',').trim();
 }
+
+/**
+ * Sentry Baggage heuristic: definitively identifies Cursor via its Sentry
+ * org credentials leaked in the Baggage header. More specific than the
+ * Traceparent-based cursorHeuristic, so it runs first in the chain.
+ *
+ * The sentry-public_key is constant across all observed Cursor entries
+ * and uniquely identifies Cursor's production Sentry deployment.
+ */
+export const sentryBaggageHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+  const baggage = entry.headers?.['Baggage'] || '';
+  if (baggage.includes('sentry-public_key=41fa59a1376ec796312848f4f17266ba')) {
+    return { isAgent: true, name: CURSOR_PROXY_AGENT.name, company: CURSOR_PROXY_AGENT.company };
+  }
+  return null;
+};
 
 /**
  * Cursor heuristic: generic Chrome UA + Traceparent (OpenTelemetry) header,
@@ -183,6 +208,7 @@ export const missingBrowserHeadersHeuristic: SignalHeuristic = (entry: SignalEnt
 /** Default heuristics for signal-based agent detection (order matters: first match wins). */
 export const DEFAULT_HEURISTICS: SignalHeuristic[] = [
   chrome122Heuristic,
+  sentryBaggageHeuristic,
   cursorHeuristic,
   conversationTrackingHeuristic,
   markdownMimeHeuristic,

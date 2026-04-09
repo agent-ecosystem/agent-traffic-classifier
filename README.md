@@ -82,6 +82,7 @@ import {
   createSignalClassifier,
   createCountryLookup,
   createCloudProviderLookup,
+  buildSessionProfiles,
   buildAgentSeeds,
   reclassifyEntries,
   detectDuplicateRequestAgents,
@@ -127,8 +128,12 @@ const seeds = buildAgentSeeds(signalEntries, classifySignalEntry);
 const domainSeeds = seeds.get('example.com') ?? null;
 const classified = reclassifyEntries(entries, domainSeeds, classify);
 
+// Build per-IP session profiles (static assets + self-site referrers)
+// to suppress false-positive "Cursor (suspected)" during traffic spikes
+const sessionProfiles = buildSessionProfiles(classified, 'example.com');
+
 // Detect proxy-based agents (e.g., Cursor's duplicate-request pattern)
-const withDuplicates = detectDuplicateRequestAgents(classified);
+const withDuplicates = detectDuplicateRequestAgents(classified, { sessionProfiles });
 
 // Upgrade programmatic clients that share IPs with known agent signals
 const withCrossRef = crossReferenceSignalIps(
@@ -173,21 +178,21 @@ const entry: LogEntry = {
 
 Every request is classified into one of these categories:
 
-| Category         | Description                                                                               |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| `human`          | Regular browser traffic                                                                   |
-| `agent`          | AI coding agents (Claude Code, Cursor, Kiro, GitHub Copilot, Gemini CLI, MCP clients)     |
-| `ai-crawler`     | AI training data crawlers (GPTBot, ClaudeBot, etc.)                                       |
-| `ai-assistant`   | AI assistants fetching live content (ChatGPT-User, GoogleAgent-URLContext)                |
-| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot, Kagibot)                         |
-| `search-crawler` | Traditional search engines (Googlebot, Bingbot)                                           |
-| `seo-bot`        | SEO/marketing bots (AhrefsBot, SemrushBot)                                                |
-| `monitoring`     | Uptime monitors (UptimeRobot, Pingdom)                                                    |
-| `social-preview` | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                          |
-| `feed-reader`    | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                             |
-| `programmatic`   | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                           |
-| `other-bot`      | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list |
-| `unknown`        | Empty or missing user-agent                                                               |
+| Category         | Description                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `human`          | Regular browser traffic                                                                             |
+| `agent`          | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, MCP clients) |
+| `ai-crawler`     | AI training data crawlers (GPTBot, ClaudeBot, etc.)                                                 |
+| `ai-assistant`   | AI assistants fetching live content (ChatGPT-User, GoogleAgent-URLContext)                          |
+| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot, Kagibot)                                   |
+| `search-crawler` | Traditional search engines (Googlebot, Bingbot)                                                     |
+| `seo-bot`        | SEO/marketing bots (AhrefsBot, SemrushBot)                                                          |
+| `monitoring`     | Uptime monitors (UptimeRobot, Pingdom)                                                              |
+| `social-preview` | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                    |
+| `feed-reader`    | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                       |
+| `programmatic`   | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                     |
+| `other-bot`      | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list           |
+| `unknown`        | Empty or missing user-agent                                                                         |
 
 Classification priority: curated bot list > programmatic client heuristic > isbot fallback > human.
 
@@ -195,15 +200,16 @@ Classification priority: curated bot list > programmatic client heuristic > isbo
 
 When HTTP header signals are available, the library applies a chain of heuristics to identify agents that use standard browser user-agents. The chain is ordered by specificity (first match wins):
 
-1. **Known agent UAs**: Claude Code (`Claude-User`), Gemini CLI (`Google-Gemini-CLI`), markdown.new
+1. **Known agent UAs**: Claude Code (`Claude-User`), Claude Agent (`Claude-Agent`), Gemini CLI (`Google-Gemini-CLI`), markdown.new
 2. **Dev tool exclusion**: curl and other known developer tools are excluded from agent classification
 3. **Chrome 122 / macOS 14.7.2**: Frozen browser fingerprint used by Chinese AI assistant services. With CN country IP, returns "Kimi / Doubao / DeepSeek (suspected)"
-4. **Cursor (Traceparent)**: Generic Chrome UA with OpenTelemetry tracing headers, excluding VS Code
-5. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
-6. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
-7. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, markdown variants)
-8. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
-9. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
+4. **Cursor (Sentry Baggage)**: Definitively identifies Cursor via its Sentry org credentials leaked in the `Baggage` header
+5. **Cursor (Traceparent)**: Generic Chrome UA with OpenTelemetry tracing headers, excluding VS Code
+6. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
+7. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
+8. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, Cursor, got-pattern, markdown variants)
+9. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
+10. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
 
 All heuristics are exported individually so you can reorder, replace, or extend the chain.
 
@@ -308,7 +314,12 @@ const { classifySignalEntry, getSignalSummary } = createSignalClassifier({
 ### Session options
 
 ```ts
-import { detectDuplicateRequestAgents } from 'agent-traffic-classifier';
+import { buildSessionProfiles, detectDuplicateRequestAgents } from 'agent-traffic-classifier';
+
+// Build session profiles from the full (unfiltered) classified entries.
+// This checks each IP for static asset requests and self-site referrers,
+// which are strong indicators of real browser sessions.
+const sessionProfiles = buildSessionProfiles(classified, 'example.com');
 
 const result = detectDuplicateRequestAgents(classified, {
   windowSeconds: 120, // Signal seed matching window (default: 60)
@@ -319,6 +330,9 @@ const result = detectDuplicateRequestAgents(classified, {
     company: 'Codeium',
     suspectedName: 'Windsurf (suspected)',
   },
+  // Suppress false-positive "suspected" labels when both IPs in a
+  // duplicate pair have browser-like sessions (static assets + self-referrers)
+  sessionProfiles,
 });
 ```
 
@@ -361,6 +375,7 @@ const docs = aggregate(classified, {
 
 ### Sessions
 
+- **`buildSessionProfiles(entries, domain)`** -- Build per-IP session profiles (static assets, self-site referrers) for false-positive suppression
 - **`buildAgentSeeds(signalEntries, classifySignalEntry)`** -- Build agent seeds grouped by domain
 - **`reclassifyEntries(entries, domainSeeds, classifyFn, options?)`** -- Reclassify access log entries using signal seeds
 - **`detectDuplicateRequestAgents(entries, options?)`** -- Detect proxy-based agents via duplicate-request heuristic
@@ -399,6 +414,7 @@ import {
   SUSPECTED_AGENTS,
   DEFAULT_ACCEPT_TAXONOMY,
   // Individual heuristics
+  sentryBaggageHeuristic,
   cursorHeuristic,
   chrome122Heuristic,
   conversationTrackingHeuristic,

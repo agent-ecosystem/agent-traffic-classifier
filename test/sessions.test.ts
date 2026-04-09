@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildSessionProfiles,
   buildAgentSeeds,
   reclassifyEntries,
   detectDuplicateRequestAgents,
@@ -7,7 +8,7 @@ import {
 } from '../src/sessions.js';
 import { createSignalClassifier } from '../src/signals.js';
 import { createClassifier } from '../src/classify.js';
-import type { ClassifiedEntry, LogEntry, SignalEntry } from '../src/types.js';
+import type { ClassifiedEntry, LogEntry, SessionProfile, SignalEntry } from '../src/types.js';
 
 const toEpoch = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -327,6 +328,188 @@ describe('detectDuplicateRequestAgents', () => {
     );
     expect(agentEntry!.classification.botName).toBe('Windsurf (suspected)');
     expect(agentEntry!.classification.botCompany).toBe('Codeium');
+  });
+});
+
+describe('buildSessionProfiles', () => {
+  it('detects static assets and self-site referrers', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', referrer: 'https://example.com/' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/style.css' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = buildSessionProfiles(entries, 'example.com');
+    expect(profiles.get('1.1.1.1')).toEqual({ hasStaticAssets: true, hasSelfReferrer: true });
+    expect(profiles.get('2.2.2.2')).toEqual({ hasStaticAssets: false, hasSelfReferrer: false });
+  });
+
+  it('recognizes various static asset extensions', () => {
+    const extensions = ['.css', '.js', '.png', '.jpg', '.ico', '.svg', '.woff2', '.gif', '.webp'];
+    for (const ext of extensions) {
+      const entries: ClassifiedEntry[] = [
+        {
+          entry: makeLogEntry({ ip: '1.1.1.1', path: `/asset${ext}` }),
+          classification: { category: 'human', botName: null, botCompany: null },
+        },
+      ];
+      const profiles = buildSessionProfiles(entries, 'test.com');
+      expect(profiles.get('1.1.1.1')?.hasStaticAssets).toBe(true);
+    }
+  });
+
+  it('does not flag external referrers as self-site', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({
+          ip: '1.1.1.1',
+          path: '/page',
+          referrer: 'https://news.ycombinator.com/',
+        }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = buildSessionProfiles(entries, 'example.com');
+    expect(profiles.get('1.1.1.1')?.hasSelfReferrer).toBe(false);
+  });
+
+  it('ignores dash referrer', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', referrer: '-' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = buildSessionProfiles(entries, 'example.com');
+    expect(profiles.get('1.1.1.1')?.hasSelfReferrer).toBe(false);
+  });
+});
+
+describe('detectDuplicateRequestAgents with session profiles', () => {
+  function makeProfiles(map: Record<string, SessionProfile>): Map<string, SessionProfile> {
+    return new Map(Object.entries(map));
+  }
+
+  it('suppresses suspected label when both IPs have browser-like sessions', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = makeProfiles({
+      '1.1.1.1': { hasStaticAssets: true, hasSelfReferrer: true },
+      '2.2.2.2': { hasStaticAssets: true, hasSelfReferrer: true },
+    });
+    const result = detectDuplicateRequestAgents(entries, { sessionProfiles: profiles });
+    // Both are real browsers: no agent label, no proxy duplicate
+    expect(result.every((e) => e.classification.category === 'human')).toBe(true);
+    expect(result.every((e) => !e.classification.proxyDuplicate)).toBe(true);
+  });
+
+  it('still labels suspected when neither IP has browser-like sessions', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = makeProfiles({
+      '1.1.1.1': { hasStaticAssets: false, hasSelfReferrer: false },
+      '2.2.2.2': { hasStaticAssets: false, hasSelfReferrer: false },
+    });
+    const result = detectDuplicateRequestAgents(entries, { sessionProfiles: profiles });
+    const agentEntry = result.find(
+      (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
+    );
+    expect(agentEntry).toBeDefined();
+    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
+  });
+
+  it('still labels suspected when only one IP has browser-like session', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = makeProfiles({
+      '1.1.1.1': { hasStaticAssets: true, hasSelfReferrer: true },
+      '2.2.2.2': { hasStaticAssets: false, hasSelfReferrer: false },
+    });
+    const result = detectDuplicateRequestAgents(entries, { sessionProfiles: profiles });
+    const agentEntry = result.find(
+      (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
+    );
+    expect(agentEntry).toBeDefined();
+    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
+  });
+
+  it('does not suppress confirmed Cursor (signal-corroborated) even with browser sessions', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'agent', botName: 'unidentified', botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    const profiles = makeProfiles({
+      '1.1.1.1': { hasStaticAssets: true, hasSelfReferrer: true },
+      '2.2.2.2': { hasStaticAssets: true, hasSelfReferrer: true },
+    });
+    const result = detectDuplicateRequestAgents(entries, { sessionProfiles: profiles });
+    const agentEntry = result.find(
+      (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
+    );
+    // Signal data + duplicate = confirmed Cursor, not affected by session gate
+    expect(agentEntry!.classification.botName).toBe('Cursor');
+  });
+
+  it('requires BOTH static assets and self-referrer to suppress', () => {
+    const entries: ClassifiedEntry[] = [
+      {
+        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+      {
+        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
+        classification: { category: 'human', botName: null, botCompany: null },
+      },
+    ];
+    // Both IPs have static assets but no self-referrer: still suspected
+    const profiles = makeProfiles({
+      '1.1.1.1': { hasStaticAssets: true, hasSelfReferrer: false },
+      '2.2.2.2': { hasStaticAssets: true, hasSelfReferrer: false },
+    });
+    const result = detectDuplicateRequestAgents(entries, { sessionProfiles: profiles });
+    const agentEntry = result.find(
+      (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
+    );
+    expect(agentEntry).toBeDefined();
+    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
   });
 });
 

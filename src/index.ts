@@ -15,6 +15,7 @@ export type {
   SignalClassifierOptions,
   ProxyAgentConfig,
   SessionOptions,
+  SessionProfile,
   AgentSeed,
   SignalAgentSummary,
   SignalSummary,
@@ -67,6 +68,7 @@ export type {
 
 // Session attribution
 export {
+  buildSessionProfiles,
   buildAgentSeeds,
   reclassifyEntries,
   detectDuplicateRequestAgents,
@@ -88,6 +90,7 @@ export {
   DEFAULT_HEURISTICS,
   SUSPECTED_AGENTS,
   DEFAULT_ACCEPT_TAXONOMY,
+  sentryBaggageHeuristic,
   cursorHeuristic,
   chrome122Heuristic,
   conversationTrackingHeuristic,

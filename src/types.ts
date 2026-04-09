@@ -97,11 +97,22 @@ export interface ProxyAgentConfig {
   suspectedName: string;
 }
 
+/**
+ * Per-IP session profile used to distinguish real browsers from agents.
+ * Built from the full (unfiltered) access log entries for a site.
+ */
+export interface SessionProfile {
+  hasStaticAssets: boolean;
+  hasSelfReferrer: boolean;
+}
+
 /** Options for session functions. */
 export interface SessionOptions {
   windowSeconds?: number;
   proxyWindowSeconds?: number;
   proxyAgent?: ProxyAgentConfig;
+  /** Per-IP session profiles for suppressing false-positive duplicate-request detection. */
+  sessionProfiles?: Map<string, SessionProfile>;
 }
 
 /** An agent seed built from signal entries, used for session attribution. */

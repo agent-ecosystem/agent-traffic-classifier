@@ -36,6 +36,18 @@
       "company": null,
       "category": "agent"
     },
+    {
+      "pattern": "Claude-Agent",
+      "name": "Claude Agent",
+      "company": "Anthropic",
+      "category": "agent"
+    },
+    {
+      "pattern": "ButlerAide",
+      "name": "ButlerAide",
+      "company": null,
+      "category": "agent"
+    },
 
     { "pattern": "GPTBot", "name": "GPTBot", "company": "OpenAI", "category": "ai-crawler" },
     {
@@ -99,6 +111,18 @@
       "category": "ai-assistant"
     },
     {
+      "pattern": "GoogleAgent-Chrome",
+      "name": "GoogleAgent-Chrome",
+      "company": "Google",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "Google-NotebookLM",
+      "name": "Google NotebookLM",
+      "company": "Google",
+      "category": "ai-assistant"
+    },
+    {
       "pattern": "Meta-ExternalAgent",
       "name": "Meta-ExternalAgent",
       "company": "Meta",
@@ -148,6 +172,12 @@
     },
     { "pattern": "YouBot", "name": "YouBot", "company": "You.com", "category": "ai-search" },
     { "pattern": "Diffbot", "name": "Diffbot", "company": "Diffbot", "category": "ai-crawler" },
+    {
+      "pattern": "TechDigest",
+      "name": "TechDigest",
+      "company": null,
+      "category": "ai-crawler"
+    },
     {
       "pattern": "img2dataset",
       "name": "img2dataset",

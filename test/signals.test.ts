@@ -59,6 +59,50 @@ describe('createSignalClassifier', () => {
       expect(result.company).toBe('Anysphere');
     });
 
+    it('detects Cursor definitively via Sentry Baggage header', () => {
+      const entry = makeSignalEntry({
+        headers: {
+          'User-Agent': 'Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36',
+          Baggage:
+            'sentry-environment=production,sentry-public_key=41fa59a1376ec796312848f4f17266ba,sentry-trace_id=abc123,sentry-org_id=4510313822748672',
+          'Sentry-Trace': 'abc123-def456-0',
+          Traceparent: '00-abc123-def456-01',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Cursor');
+      expect(result.company).toBe('Anysphere');
+    });
+
+    it('does not trigger Sentry heuristic for different sentry-public_key', () => {
+      const entry = makeSignalEntry({
+        headers: {
+          'User-Agent': 'Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36',
+          Baggage:
+            'sentry-environment=production,sentry-public_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          Traceparent: '00-abc123-def456-01',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      // Should fall through to cursorHeuristic (via Traceparent), not sentryBaggage
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Cursor');
+    });
+
+    it('falls through from Sentry to Traceparent heuristic when no Baggage', () => {
+      const entry = makeSignalEntry({
+        headers: {
+          'User-Agent': 'Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36',
+          Traceparent: '00-abc123-def456-01',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Cursor');
+      expect(result.company).toBe('Anysphere');
+    });
+
     it('does not trigger Cursor heuristic when Code/ is in UA (VS Code)', () => {
       const entry = makeSignalEntry({
         headers: {
@@ -106,6 +150,26 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(false);
+    });
+
+    it('identifies Claude Agent (preflight) by UA pattern', () => {
+      const entry = makeSignalEntry({
+        headers: { 'User-Agent': 'Claude-Agent/1.0 (preflight)' },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Claude Agent');
+      expect(result.company).toBe('Anthropic');
+    });
+
+    it('identifies Claude Agent (smart-fetch) by UA pattern', () => {
+      const entry = makeSignalEntry({
+        headers: { 'User-Agent': 'Claude-Agent/1.0 (smart-fetch)' },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Claude Agent');
+      expect(result.company).toBe('Anthropic');
     });
 
     it('identifies markdown.new by UA pattern', () => {
@@ -407,6 +471,33 @@ describe('createSignalClassifier', () => {
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
       expect(result.name).toBe('markdown agent (minimal)');
+    });
+
+    it('detects Cursor suspected pattern via Accept taxonomy', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent': 'SomeClient/1.0',
+          Accept:
+            'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Cursor (suspected)');
+    });
+
+    it('detects got-pattern agent via Accept taxonomy', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent': 'SomeClient/1.0',
+          Accept: 'text/markdown, text/plain;q=0.9, */*;q=0.8',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('got-pattern agent');
     });
 
     it('does not match non-markdown Accept headers', () => {

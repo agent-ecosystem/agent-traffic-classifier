@@ -22,6 +22,9 @@ export const DEFAULT_PROGRAMMATIC: string[] = [
   'undici',
   'trafilatura',
   'http.rb',
+  'Bun/',
+  'got (',
+  'HeadlessChrome',
 ];
 
 /**
