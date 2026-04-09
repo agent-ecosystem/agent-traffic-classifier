@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { parseIpv4, parseCidr, matchesCidr, buildCidrIndex } from '../src/adapters/ip-ranges.js';
+import { describe, it, expect, vi } from 'vitest';
+import {
+  parseIpv4,
+  parseCidr,
+  matchesCidr,
+  buildCidrIndex,
+  createCloudProviderLookup,
+  createCountryLookup,
+  createIpLookup,
+} from '../src/adapters/ip-ranges.js';
 
 describe('parseIpv4', () => {
   it('parses a valid IPv4 address', () => {
@@ -120,5 +128,265 @@ describe('buildCidrIndex', () => {
     ]);
     expect(lookup('10.0.0.5')).toBe('narrow');
     expect(lookup('10.1.0.5')).toBe('wide');
+  });
+});
+
+describe('createCloudProviderLookup', () => {
+  it('builds index from custom providers', async () => {
+    const lookup = await createCloudProviderLookup({
+      providers: [
+        {
+          name: 'test-cloud',
+          fetch: async () => [
+            { cidr: '10.0.0.0/8', tag: 'test-cloud' },
+            { cidr: '172.16.0.0/12', tag: 'test-cloud' },
+          ],
+        },
+      ],
+    });
+    expect(lookup('10.1.2.3')).toBe('test-cloud');
+    expect(lookup('172.16.5.1')).toBe('test-cloud');
+    expect(lookup('8.8.8.8')).toBeUndefined();
+  });
+
+  it('combines ranges from multiple providers', async () => {
+    const lookup = await createCloudProviderLookup({
+      providers: [
+        { name: 'alpha', fetch: async () => [{ cidr: '10.0.0.0/8', tag: 'alpha' }] },
+        { name: 'beta', fetch: async () => [{ cidr: '192.168.0.0/16', tag: 'beta' }] },
+      ],
+    });
+    expect(lookup('10.1.2.3')).toBe('alpha');
+    expect(lookup('192.168.1.1')).toBe('beta');
+  });
+
+  it('gracefully handles provider fetch failures', async () => {
+    const lookup = await createCloudProviderLookup({
+      providers: [
+        {
+          name: 'failing',
+          fetch: async () => {
+            throw new Error('network error');
+          },
+        },
+        { name: 'working', fetch: async () => [{ cidr: '10.0.0.0/8', tag: 'working' }] },
+      ],
+    });
+    // The working provider's ranges should still be available
+    expect(lookup('10.1.2.3')).toBe('working');
+  });
+
+  it('returns empty lookup when all providers fail', async () => {
+    const lookup = await createCloudProviderLookup({
+      providers: [
+        {
+          name: 'broken',
+          fetch: async () => {
+            throw new Error('fail');
+          },
+        },
+      ],
+    });
+    expect(lookup('10.1.2.3')).toBeUndefined();
+  });
+});
+
+describe('createCountryLookup', () => {
+  it('parses RIR delegation data for requested countries', async () => {
+    // Simulate RIR delegation format: registry|CC|type|start|value|date|status
+    const rirData = [
+      '# Comment line',
+      'apnic|CN|ipv4|1.0.0.0|256|20100101|allocated',
+      'apnic|JP|ipv4|1.0.16.0|4096|20100101|allocated',
+      'apnic|CN|ipv6|2001:200::|35|20100101|allocated',
+      'apnic|CN|ipv4|223.255.254.0|512|20100101|allocated',
+    ].join('\n');
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => rirData,
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createCountryLookup(['CN'], { rirUrls: ['https://mock-rir/'] });
+      // 1.0.0.0/256 = /24 (power of 2)
+      expect(lookup('1.0.0.1')).toBe('CN');
+      // JP entries should be excluded (only CN requested)
+      expect(lookup('1.0.16.1')).toBeUndefined();
+      // IPv6 lines should be skipped
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('handles non-power-of-2 allocations by splitting into CIDR blocks', async () => {
+    // 768 addresses = 512 + 256 (not a power of 2)
+    const rirData = 'apnic|CN|ipv4|10.0.0.0|768|20100101|allocated\n';
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => rirData,
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createCountryLookup(['CN'], { rirUrls: ['https://mock-rir/'] });
+      // 768 = 512 (/23) + 256 (/24)
+      // First block: 10.0.0.0/23 covers 10.0.0.0 - 10.0.1.255
+      expect(lookup('10.0.0.1')).toBe('CN');
+      expect(lookup('10.0.1.255')).toBe('CN');
+      // Second block: 10.0.2.0/24 covers 10.0.2.0 - 10.0.2.255
+      expect(lookup('10.0.2.1')).toBe('CN');
+      // Outside the allocation
+      expect(lookup('10.0.3.1')).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('handles failed RIR fetch gracefully', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createCountryLookup(['CN'], { rirUrls: ['https://mock-rir/'] });
+      expect(lookup('1.0.0.1')).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('handles RIR network errors gracefully', async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error('network error'));
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createCountryLookup(['CN'], { rirUrls: ['https://mock-rir/'] });
+      expect(lookup('1.0.0.1')).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('normalizes country codes to uppercase', async () => {
+    const rirData = 'apnic|CN|ipv4|10.0.0.0|256|20100101|allocated\n';
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => rirData,
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      // Lowercase input should still match
+      const lookup = await createCountryLookup(['cn'], { rirUrls: ['https://mock-rir/'] });
+      expect(lookup('10.0.0.1')).toBe('CN');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('skips malformed RIR lines', async () => {
+    const rirData = [
+      'too|few|fields',
+      '|CN|ipv4|10.0.0.0|256|20100101|allocated',
+      'apnic|CN|ipv4|invalid-ip|256|20100101|allocated',
+      'apnic|CN|ipv4|10.0.0.0|notanumber|20100101|allocated',
+      'apnic|CN|ipv4|10.1.0.0|256|20100101|allocated',
+    ].join('\n');
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => rirData,
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createCountryLookup(['CN'], { rirUrls: ['https://mock-rir/'] });
+      // Only the last valid line should produce a match
+      expect(lookup('10.1.0.1')).toBe('CN');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('createIpLookup', () => {
+  it('combines cloud and country lookups', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => 'apnic|CN|ipv4|10.0.0.0|256|20100101|allocated\n',
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createIpLookup({
+        cloudProviders: {
+          providers: [
+            { name: 'test', fetch: async () => [{ cidr: '192.168.0.0/16', tag: 'test-cloud' }] },
+          ],
+        },
+        countries: ['CN'],
+        countryOptions: { rirUrls: ['https://mock-rir/'] },
+      });
+
+      const cloudResult = lookup('192.168.1.1');
+      expect(cloudResult.cloudProvider).toBe('test-cloud');
+
+      const countryResult = lookup('10.0.0.1');
+      expect(countryResult.country).toBe('CN');
+
+      const noMatch = lookup('8.8.8.8');
+      expect(noMatch.cloudProvider).toBeUndefined();
+      expect(noMatch.country).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('skips cloud lookup when cloudProviders is false', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => 'apnic|CN|ipv4|10.0.0.0|256|20100101|allocated\n',
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const lookup = await createIpLookup({
+        cloudProviders: false,
+        countries: ['CN'],
+        countryOptions: { rirUrls: ['https://mock-rir/'] },
+      });
+
+      const result = lookup('10.0.0.1');
+      expect(result.country).toBe('CN');
+      expect(result.cloudProvider).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('skips country lookup when no countries specified', async () => {
+    const lookup = await createIpLookup({
+      cloudProviders: {
+        providers: [{ name: 'test', fetch: async () => [{ cidr: '10.0.0.0/8', tag: 'test' }] }],
+      },
+      countries: [],
+    });
+
+    const result = lookup('10.1.2.3');
+    expect(result.cloudProvider).toBe('test');
+    expect(result.country).toBeUndefined();
+  });
+
+  it('returns empty info when no options match', async () => {
+    const lookup = await createIpLookup({
+      cloudProviders: {
+        providers: [{ name: 'test', fetch: async () => [] }],
+      },
+    });
+
+    const result = lookup('8.8.8.8');
+    expect(result).toEqual({});
   });
 });

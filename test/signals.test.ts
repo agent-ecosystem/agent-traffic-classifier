@@ -398,6 +398,73 @@ describe('createSignalClassifier', () => {
       expect(result!.identifiedAgents[0].uniqueIPs).toBe(2);
     });
 
+    it('accumulates byTrigger counts across entries', () => {
+      const entries = [
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Claude-User/1.0' },
+          trigger: 'content-negotiation',
+        }),
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Claude-User/1.0' },
+          trigger: 'content-negotiation',
+          ip: '5.6.7.8',
+        }),
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Claude-User/1.0' },
+          trigger: 'llms-txt',
+          ip: '9.9.9.9',
+        }),
+      ];
+      const result = getSignalSummary(entries, '2026-04-04', -420);
+      expect(result).not.toBeNull();
+      expect(result!.byTrigger['content-negotiation']).toBe(2);
+      expect(result!.byTrigger['llms-txt']).toBe(1);
+    });
+
+    it('builds per-agent trigger breakdown', () => {
+      const entries = [
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Claude-User/1.0' },
+          trigger: 'content-negotiation',
+        }),
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Claude-User/1.0' },
+          trigger: 'llms-txt',
+          ip: '5.6.7.8',
+        }),
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Google-Gemini-CLI/1.0' },
+          trigger: 'content-negotiation',
+          ip: '7.7.7.7',
+        }),
+      ];
+      const result = getSignalSummary(entries, '2026-04-04', -420);
+      expect(result).not.toBeNull();
+      expect(result!.identifiedAgents).toHaveLength(2);
+
+      const claude = result!.identifiedAgents.find((a) => a.name === 'Claude Code')!;
+      expect(claude.requests).toBe(2);
+      expect(claude.byTrigger['content-negotiation']).toBe(1);
+      expect(claude.byTrigger['llms-txt']).toBe(1);
+
+      const gemini = result!.identifiedAgents.find((a) => a.name === 'Gemini CLI')!;
+      expect(gemini.requests).toBe(1);
+      expect(gemini.byTrigger['content-negotiation']).toBe(1);
+    });
+
+    it('handles entries without triggers', () => {
+      const entries = [
+        makeSignalEntry({
+          headers: { 'User-Agent': 'Claude-User/1.0' },
+          // No trigger
+        }),
+      ];
+      const result = getSignalSummary(entries, '2026-04-04', -420);
+      expect(result).not.toBeNull();
+      expect(result!.byTrigger).toEqual({});
+      expect(result!.identifiedAgents[0].byTrigger).toEqual({});
+    });
+
     it('excludes entries from a different date', () => {
       const entries = [
         makeSignalEntry({

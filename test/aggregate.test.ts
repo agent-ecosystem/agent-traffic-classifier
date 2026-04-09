@@ -307,6 +307,92 @@ describe('aggregate', () => {
     expect(docs[0].topPaths[0].path).toBe('/about');
   });
 
+  it('sorts referrers by count descending', () => {
+    const entries: ClassifiedEntry[] = [
+      makeClassified({ referrer: 'https://low.com' }, { category: 'human' }),
+      makeClassified({ referrer: 'https://high.com' }, { category: 'human' }),
+      makeClassified({ referrer: 'https://high.com' }, { category: 'human' }),
+      makeClassified({ referrer: 'https://high.com' }, { category: 'human' }),
+      makeClassified({ referrer: 'https://mid.com' }, { category: 'human' }),
+      makeClassified({ referrer: 'https://mid.com' }, { category: 'human' }),
+    ];
+    const docs = aggregate(entries, { domain: 'example.com' });
+    expect(docs[0].topReferrers[0].referrer).toBe('https://high.com');
+    expect(docs[0].topReferrers[0].count).toBe(3);
+    expect(docs[0].topReferrers[1].referrer).toBe('https://mid.com');
+    expect(docs[0].topReferrers[2].referrer).toBe('https://low.com');
+  });
+
+  it('sorts AI bot paths by count descending', () => {
+    const entries: ClassifiedEntry[] = [
+      makeClassified(
+        { path: '/low/' },
+        { category: 'ai-crawler', botName: 'GPTBot', botCompany: 'OpenAI' },
+      ),
+      makeClassified(
+        { path: '/high/' },
+        { category: 'ai-crawler', botName: 'GPTBot', botCompany: 'OpenAI' },
+      ),
+      makeClassified(
+        { path: '/high/' },
+        { category: 'ai-crawler', botName: 'GPTBot', botCompany: 'OpenAI' },
+      ),
+      makeClassified(
+        { path: '/high/' },
+        { category: 'ai-crawler', botName: 'GPTBot', botCompany: 'OpenAI' },
+      ),
+      makeClassified(
+        { path: '/mid/' },
+        { category: 'ai-crawler', botName: 'GPTBot', botCompany: 'OpenAI' },
+      ),
+      makeClassified(
+        { path: '/mid/' },
+        { category: 'ai-crawler', botName: 'GPTBot', botCompany: 'OpenAI' },
+      ),
+    ];
+    const docs = aggregate(entries, { domain: 'example.com' });
+    const gpt = docs[0].aiBots.find((b) => b.name === 'GPTBot')!;
+    expect(gpt.topPaths[0].path).toBe('/high/');
+    expect(gpt.topPaths[0].count).toBe(3);
+    expect(gpt.topPaths[1].path).toBe('/mid/');
+    expect(gpt.topPaths[2].path).toBe('/low/');
+  });
+
+  it('sorts agent paths by count descending', () => {
+    const entries: ClassifiedEntry[] = [
+      makeClassified(
+        { path: '/low/' },
+        { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
+      ),
+      makeClassified(
+        { path: '/high/' },
+        { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
+      ),
+      makeClassified(
+        { path: '/high/' },
+        { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
+      ),
+      makeClassified(
+        { path: '/high/' },
+        { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
+      ),
+      makeClassified(
+        { path: '/mid/' },
+        { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
+      ),
+      makeClassified(
+        { path: '/mid/' },
+        { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
+      ),
+    ];
+    const docs = aggregate(entries, { domain: 'example.com' });
+    const claude = docs[0].agents.find((a) => a.name === 'Claude Code')!;
+    expect(claude.topPaths[0].path).toBe('/high/');
+    expect(claude.topPaths[0].count).toBe(3);
+    expect(claude.topPaths[1].path).toBe('/mid/');
+    expect(claude.topPaths[2].path).toBe('/low/');
+  });
+
   it('pre-filters signal entries by domain', () => {
     const entries: ClassifiedEntry[] = [
       makeClassified({}, { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' }),
