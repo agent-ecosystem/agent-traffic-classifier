@@ -20,7 +20,9 @@ describe('createSignalClassifier', () => {
   describe('classifySignalEntry', () => {
     it('identifies Claude Code by UA pattern', () => {
       const entry = makeSignalEntry({
-        headers: { 'User-Agent': 'Claude-User/1.0' },
+        headers: {
+          'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+        },
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
@@ -46,7 +48,7 @@ describe('createSignalClassifier', () => {
       expect(result.isAgent).toBe(false);
     });
 
-    it('detects Cursor via Traceparent heuristic', () => {
+    it('labels Traceparent-only Chrome traffic as a traced proxy agent', () => {
       const entry = makeSignalEntry({
         headers: {
           'User-Agent': 'Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36',
@@ -55,7 +57,22 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor');
+      expect(result.name).toBe('traced proxy agent');
+    });
+
+    it('labels Traceparent plus Cursor Accept header as Cursor (suspected)', () => {
+      const entry = makeSignalEntry({
+        headers: {
+          'User-Agent': 'Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36',
+          Traceparent: '00-abc123-def456-01',
+          Accept:
+            'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Cursor (suspected)');
+      expect(result.company).toBe('Anysphere');
       expect(result.company).toBe('Anysphere');
     });
 
@@ -75,6 +92,49 @@ describe('createSignalClassifier', () => {
       expect(result.company).toBe('Anysphere');
     });
 
+    it('identifies Cursor by its confirmed fetch fingerprint (September 2026 controlled test)', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+          Accept:
+            'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          'Accept-Encoding': 'gzip, deflate, br',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('Cursor');
+      expect(result.company).toBe('Anysphere');
+    });
+
+    it('does not apply the Cursor fetch fingerprint when Sec-Ch-Ua or the no-cache headers are missing', () => {
+      const base = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/145.0.0.0 Safari/537.36',
+        Accept:
+          'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      };
+      const withClientHints = classifySignalEntry(
+        makeSignalEntry({
+          trigger: 'content-negotiation',
+          headers: { ...base, 'Sec-Ch-Ua': '"Chromium";v="145"' },
+        }),
+      );
+      expect(withClientHints.name).not.toBe('Cursor');
+      const { Pragma: _p, ...noPragma } = base;
+      const withoutPragma = classifySignalEntry(
+        makeSignalEntry({ trigger: 'content-negotiation', headers: noPragma }),
+      );
+      expect(withoutPragma.isAgent).toBe(true);
+      expect(withoutPragma.name).toBe('Cursor (suspected)');
+    });
+
     it('does not trigger Sentry heuristic for different sentry-public_key', () => {
       const entry = makeSignalEntry({
         headers: {
@@ -85,9 +145,9 @@ describe('createSignalClassifier', () => {
         },
       });
       const result = classifySignalEntry(entry);
-      // Should fall through to cursorHeuristic (via Traceparent), not sentryBaggage
+      // Should fall through to tracedProxyHeuristic (via Traceparent), not sentryBaggage
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor');
+      expect(result.name).toBe('traced proxy agent');
     });
 
     it('falls through from Sentry to Traceparent heuristic when no Baggage', () => {
@@ -99,8 +159,7 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor');
-      expect(result.company).toBe('Anysphere');
+      expect(result.name).toBe('traced proxy agent');
     });
 
     it('does not trigger Cursor heuristic when Code/ is in UA (VS Code)', () => {
@@ -379,12 +438,16 @@ describe('createSignalClassifier', () => {
       const entries = [
         makeSignalEntry({
           timestamp: toEpoch('2026-04-04T20:49:28Z'),
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'content-negotiation',
         }),
         makeSignalEntry({
           timestamp: toEpoch('2026-04-04T21:00:00Z'),
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'llms-txt',
           ip: '5.6.7.8',
         }),
@@ -401,16 +464,22 @@ describe('createSignalClassifier', () => {
     it('accumulates byTrigger counts across entries', () => {
       const entries = [
         makeSignalEntry({
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'content-negotiation',
         }),
         makeSignalEntry({
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'content-negotiation',
           ip: '5.6.7.8',
         }),
         makeSignalEntry({
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'llms-txt',
           ip: '9.9.9.9',
         }),
@@ -424,11 +493,15 @@ describe('createSignalClassifier', () => {
     it('builds per-agent trigger breakdown', () => {
       const entries = [
         makeSignalEntry({
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'content-negotiation',
         }),
         makeSignalEntry({
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'llms-txt',
           ip: '5.6.7.8',
         }),
@@ -455,7 +528,9 @@ describe('createSignalClassifier', () => {
     it('handles entries without triggers', () => {
       const entries = [
         makeSignalEntry({
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           // No trigger
         }),
       ];
@@ -470,13 +545,17 @@ describe('createSignalClassifier', () => {
         makeSignalEntry({
           // This is April 5 UTC, which is April 4 PDT — should match
           timestamp: toEpoch('2026-04-05T05:00:00Z'),
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'content-negotiation',
         }),
         makeSignalEntry({
           // This is April 5 UTC late — April 5 PDT — should NOT match
           timestamp: toEpoch('2026-04-05T20:00:00Z'),
-          headers: { 'User-Agent': 'Claude-User/1.0' },
+          headers: {
+            'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+          },
           trigger: 'content-negotiation',
           ip: '9.9.9.9',
         }),
@@ -540,7 +619,7 @@ describe('createSignalClassifier', () => {
       expect(result.name).toBe('markdown agent (minimal)');
     });
 
-    it('detects Cursor suspected pattern via Accept taxonomy', () => {
+    it('labels an Accept-only Cursor match as suspected via the taxonomy', () => {
       const entry = makeSignalEntry({
         trigger: 'content-negotiation',
         headers: {
@@ -661,6 +740,149 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.name).not.toBe('browser-masked agent');
+    });
+  });
+
+  describe('curated bot database consultation', () => {
+    it('does not seed an agent for a known crawler hitting llms.txt', () => {
+      const entry = makeSignalEntry({
+        trigger: 'llms-txt',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.4; +https://openai.com/gptbot)',
+          Accept: '*/*',
+        },
+      });
+      expect(classifySignalEntry(entry).isAgent).toBe(false);
+    });
+
+    it('does not seed an agent for a known AI search bot with an agent-like Accept header', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ExaSearchBot/1.0; +https://crawler.exa.ai/)',
+          Accept:
+            'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+        },
+      });
+      expect(classifySignalEntry(entry).isAgent).toBe(false);
+    });
+
+    it('does not treat bare Claude-User (Claude.ai user fetch) as Claude Code', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +claude-user@anthropic.com)',
+          Accept: 'text/markdown, text/html, */*',
+        },
+      });
+      expect(classifySignalEntry(entry).isAgent).toBe(false);
+    });
+
+    it('identifies self-identifying coding agents from the bot database', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.138.0 Chrome/148.0.7778.280 Electron/42.10.0 Safari/537.36',
+          Accept:
+            'text/markdown, text/html;q=0.9, application/xhtml+xml;q=0.9, application/xml;q=0.8, */*;q=0.7',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('GitHub Copilot');
+      expect(result.company).toBe('Microsoft');
+    });
+
+    it('still runs heuristics for UAs the bot database does not curate', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: { 'User-Agent': 'python-httpx/0.28.1', Accept: 'text/markdown' },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('markdown agent (minimal)');
+    });
+
+    it('can be disabled with botClassifier: null', () => {
+      const { classifySignalEntry: classify } = createSignalClassifier({ botClassifier: null });
+      const entry = makeSignalEntry({
+        trigger: 'llms-txt',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.4; +https://openai.com/gptbot)',
+        },
+      });
+      const result = classify(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('unidentified');
+    });
+  });
+
+  describe('html-first Accept taxonomy', () => {
+    it('names the shared html/json/markdown/csv framework', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,text/markdown;q=0.7,text/plain;q=0.6,text/csv;q=0.6,*/*;q=0.5',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('html-first agent');
+    });
+  });
+
+  describe('plain-text fetcher heuristic', () => {
+    it('detects a browser UA sending a bare text/plain Accept', () => {
+      const entry = makeSignalEntry({
+        trigger: 'llms-txt',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Android 14; Mobile; rv:123.0) Gecko/123.0 Firefox/123',
+          Accept: 'text/plain',
+          'Accept-Encoding': 'gzip',
+          'Cache-Control': 'no-cache',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('plain-text fetcher (browser-masked)');
+    });
+
+    it('does not trigger when Sec-Ch-Ua is present', () => {
+      const entry = makeSignalEntry({
+        trigger: 'llms-txt',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36',
+          Accept: 'text/plain',
+          'Sec-Ch-Ua': '"Chromium";v="131"',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.name).not.toBe('plain-text fetcher (browser-masked)');
+    });
+
+    it('does not trigger for non-browser UAs or richer Accept headers', () => {
+      expect(
+        classifySignalEntry(
+          makeSignalEntry({ headers: { 'User-Agent': 'SomeTool/1.0', Accept: 'text/plain' } }),
+        ).isAgent,
+      ).toBe(false);
+      expect(
+        classifySignalEntry(
+          makeSignalEntry({
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) Firefox/123.0',
+              Accept: 'text/plain,*/*',
+            },
+          }),
+        ).isAgent,
+      ).toBe(false);
     });
   });
 

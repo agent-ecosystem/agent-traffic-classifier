@@ -135,6 +135,138 @@ describe('createClassifier', () => {
     });
   });
 
+  describe('patterns added from September 2026 traffic', () => {
+    it('classifies bare Claude-User (Claude.ai user fetch) as ai-assistant, not Claude Code', () => {
+      const result = classify(
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +claude-user@anthropic.com)',
+      );
+      expect(result.category).toBe('ai-assistant');
+      expect(result.botName).toBe('Claude-User');
+      expect(result.botCompany).toBe('Anthropic');
+    });
+
+    it('classifies Claude-SearchBot as ai-search (not ClaudeBot)', () => {
+      const result = classify(
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +claudebot@anthropic.com)',
+      );
+      expect(result.category).toBe('ai-search');
+      expect(result.botName).toBe('Claude-SearchBot');
+    });
+
+    it('classifies Perplexity-User as ai-assistant (not PerplexityBot)', () => {
+      const result = classify(
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexitybot)',
+      );
+      expect(result.category).toBe('ai-assistant');
+      expect(result.botName).toBe('Perplexity-User');
+    });
+
+    it('classifies GitHub Copilot runtime WebFetch as agent', () => {
+      const result = classify('GitHubCopilotRuntime-WebFetch');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('GitHub Copilot');
+    });
+
+    it('classifies grok-agent as agent', () => {
+      const result = classify('Mozilla/5.0 (compatible; grok-agent/1.0; +https://x.ai)');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('Grok Agent');
+      expect(result.botCompany).toBe('xAI');
+    });
+
+    it('classifies ZCode and Qoder CLIs as agents', () => {
+      expect(classify('ZCode-WebFetch/0.1 (+https://zcode.ai; coding-agent-cli)').botName).toBe(
+        'ZCode',
+      );
+      expect(classify('qodercli/1.1.51 (+https://qoder.com)').botName).toBe('Qoder CLI');
+      expect(classify('qodercli/1.1.51 (+https://qoder.com)').category).toBe('agent');
+    });
+
+    it('classifies the Claude desktop app embedded browser as agent', () => {
+      const result = classify(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.2553.0 Chrome/152.0.7977.76 Safari/537.36',
+      );
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('Claude Desktop');
+    });
+
+    it('classifies ExaSearchBot as ai-search', () => {
+      const result = classify(
+        'Mozilla/5.0 (compatible; ExaSearchBot/1.0; +https://crawler.exa.ai/)',
+      );
+      expect(result.category).toBe('ai-search');
+      expect(result.botCompany).toBe('Exa');
+    });
+
+    it('classifies SSI-Nutch as ai-crawler', () => {
+      const result = classify(
+        'SSI-Nutch/1.23 (SSI broad web crawler; https://ssi.inc/; adi@ssi.inc)',
+      );
+      expect(result.category).toBe('ai-crawler');
+      expect(result.botCompany).toBe('Safe Superintelligence');
+    });
+
+    it('classifies Amazon Quick on-behalf-of fetches as ai-assistant', () => {
+      const result = classify('amazon-Quick-on-behalf-of-1266b92d');
+      expect(result.category).toBe('ai-assistant');
+      expect(result.botName).toBe('Amazon Quick');
+    });
+
+    it('classifies BuiltWith as seo-bot (previously fell through to human)', () => {
+      const result = classify(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko; compatible; BuiltWith/1.4; rb.gy/xprgqj) Chrome/124.0.0.0 Safari/537.36',
+      );
+      expect(result.category).toBe('seo-bot');
+    });
+
+    it('classifies WebPageTest agents as monitoring', () => {
+      const result = classify(
+        'Mozilla/5.0 (Linux; Android 8.1.0; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36 PTST/260802.202201',
+      );
+      expect(result.category).toBe('monitoring');
+      expect(result.botName).toBe('WebPageTest');
+    });
+
+    it('classifies fediverse link fetchers as social-preview', () => {
+      expect(classify('Misskey/2025.4.7 (https://example.social/)').category).toBe(
+        'social-preview',
+      );
+      expect(
+        classify('Akkoma 3.20.0; https://example.social <admin@example.social>; Bot').category,
+      ).toBe('social-preview');
+      expect(
+        classify('Catodon/4.6.0-alpha.8+cat.nightly (http.rb/5.3.1; +https://example.social/)')
+          .category,
+      ).toBe('social-preview');
+    });
+
+    it('classifies Zapier, Inoreader and Reeder as feed-reader', () => {
+      expect(classify('Zapier').category).toBe('feed-reader');
+      expect(
+        classify('Inoreader/1.0 (+http://www.inoreader.com/feed-fetcher; 3 subscribers; )')
+          .category,
+      ).toBe('feed-reader');
+      expect(classify('Reeder/5050102 CFNetwork/3860.700.2 Darwin/25.6.0').category).toBe(
+        'feed-reader',
+      );
+      expect(classify('feeeed/37 CFNetwork/3860.600.12 Darwin/25.5.0').category).toBe(
+        'feed-reader',
+      );
+    });
+
+    it('classifies Scrapy, PhantomJS and Dalvik as programmatic', () => {
+      expect(classify('Scrapy/2.17.0 (+https://scrapy.org)').category).toBe('programmatic');
+      expect(
+        classify(
+          'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/538.1 (KHTML, like Gecko) PhantomJS/2.0.0 Safari/538.1',
+        ).category,
+      ).toBe('programmatic');
+      expect(
+        classify('Dalvik/2.1.0 (Linux; U; Android 9.0; ZTE BA520 Build/MRA58K)').category,
+      ).toBe('programmatic');
+    });
+  });
+
   describe('programmatic clients', () => {
     it('classifies curl', () => {
       const result = classify('curl/7.68.0');
@@ -207,7 +339,9 @@ describe('createClassifier', () => {
 
   describe('isbot fallback', () => {
     it('catches bots not in our curated list via isbot', () => {
-      const result = classify('Screaming Frog SEO Spider/17.2');
+      const result = classify(
+        'Mozilla/5.0 (compatible; SpiderLing; +https://www.sketchengine.eu/crawler/)',
+      );
       expect(result.category).toBe('other-bot');
     });
   });

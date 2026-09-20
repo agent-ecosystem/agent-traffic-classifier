@@ -3,7 +3,10 @@ import { CURSOR_PROXY_AGENT } from './sessions.js';
 
 /** Known agent UA patterns for signal classification. */
 export const DEFAULT_KNOWN_AGENTS: Array<{ pattern: string; name: string; company: string }> = [
-  { pattern: 'Claude-User', name: 'Claude Code', company: 'Anthropic' },
+  // Claude Code's WebFetch: "Claude-User (claude-code/X.Y.Z; ...)". The bare
+  // "Claude-User/1.0" UA is Claude.ai fetching on a user's behalf (ai-assistant),
+  // which the bot database handles.
+  { pattern: 'claude-code/', name: 'Claude Code', company: 'Anthropic' },
   { pattern: 'Claude-Agent', name: 'Claude Agent', company: 'Anthropic' },
   { pattern: 'Google-Gemini-CLI', name: 'Gemini CLI', company: 'Google' },
   { pattern: 'markdown.new', name: 'markdown.new', company: 'markdown.new' },
@@ -43,16 +46,32 @@ export interface AcceptPattern {
   name: string;
 }
 
+/** Cursor's Accept header (markdown first, then a browser-like preference list). */
+export const CURSOR_ACCEPT_PREFIX =
+  'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5';
+
 export const DEFAULT_ACCEPT_TAXONOMY: AcceptPattern[] = [
   // text/plain preferred over markdown — unusual ordering, distinct framework
   { prefix: 'text/plain;q=1.0,text/markdown', name: 'text-first agent' },
-  // axios-based pattern (same as Claude Code WebFetch, but from non-Claude UAs)
-  { prefix: 'text/markdown,text/html,*/*', name: 'axios-pattern agent' },
-  // Cursor Accept pattern: full browser-like preference list with markdown first
+  // HTML first, then JSON, markdown, plain text and CSV. Seen from generic Chrome UAs
+  // and from self-identifying AI search bots (Keenable, Aranet) in Sept 2026 traffic,
+  // so it is a shared fetch framework rather than a single product.
   {
     prefix:
-      'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
-    name: 'Cursor (suspected)',
+      'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,text/markdown;q=0.7,text/plain;q=0.6,text/csv;q=0.6',
+    name: 'html-first agent',
+  },
+  // axios-based pattern (same as Claude Code WebFetch, but from non-Claude UAs)
+  { prefix: 'text/markdown,text/html,*/*', name: 'axios-pattern agent' },
+  // Full browser-like preference list with markdown first. Cursor's Accept
+  // header, confirmed by controlled tests in April and September 2026. The
+  // cursorFetchHeuristic matches the full Cursor fingerprint; this entry catches
+  // Accept-only matches (e.g. a client whose proxy strips the cache headers).
+  // ExaSearchBot sends the same Accept but self-identifies and is excluded by
+  // the bot database before this runs.
+  {
+    prefix: CURSOR_ACCEPT_PREFIX,
+    name: CURSOR_PROXY_AGENT.suspectedName,
   },
   // got library: markdown + plain text preference
   { prefix: 'text/markdown,text/plain;q=0.9,*/*;q=0.8', name: 'got-pattern agent' },
@@ -86,17 +105,59 @@ export const sentryBaggageHeuristic: SignalHeuristic = (entry: SignalEntry) => {
 };
 
 /**
- * Cursor heuristic: generic Chrome UA + Traceparent (OpenTelemetry) header,
- * but NOT VS Code (which includes "Code/" in the UA).
- * Cursor proxies requests through server infrastructure that adds tracing.
+ * Cursor fetch heuristic: the full header fingerprint of Cursor's URL fetch,
+ * confirmed by a controlled test on 2026-09-19 (fetch initiated from a current
+ * Cursor build against a site with no other content-negotiation traffic):
+ *
+ * - generic Chrome UA (Chrome/145 at the time), no Code/ token
+ * - Accept: text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,...
+ * - Pragma: no-cache and Cache-Control: no-cache
+ * - no Sec-Ch-Ua (a real Chrome always sends it)
+ * - each request from a different proxy IP; no tracing or Sentry headers
+ *
+ * ExaSearchBot sends the same fingerprint with a self-identifying UA and is
+ * excluded by the bot database before this runs.
  */
-export const cursorHeuristic: SignalHeuristic = (entry: SignalEntry) => {
-  const ua = entry.headers?.['User-Agent'] || '';
-  if (entry.headers?.['Traceparent'] && ua.includes('Chrome/') && !ua.includes('Code/')) {
-    return { isAgent: true, name: CURSOR_PROXY_AGENT.name, company: CURSOR_PROXY_AGENT.company };
-  }
-  return null;
+export const cursorFetchHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+  const h = entry.headers ?? {};
+  const ua = h['User-Agent'] || '';
+  if (!ua.includes('Chrome/') || ua.includes('Code/')) return null;
+  if (h['Sec-Ch-Ua']) return null;
+  if (!normalizeAccept(h['Accept'] || '').startsWith(CURSOR_ACCEPT_PREFIX)) return null;
+  if (h['Pragma'] !== 'no-cache' || h['Cache-Control'] !== 'no-cache') return null;
+  return { isAgent: true, name: CURSOR_PROXY_AGENT.name, company: CURSOR_PROXY_AGENT.company };
 };
+
+/**
+ * Traced proxy heuristic: generic Chrome UA + Traceparent (OpenTelemetry) header,
+ * but NOT VS Code (which includes "Code/" in the UA). Tracing headers mean a
+ * server-side fetch pipeline, so this is an agent of some kind.
+ *
+ * In April 2026 this co-occurred with Cursor's Sentry Baggage header and Accept
+ * string. Controlled tests on 2026-09-19 (direct URL fetch and Agent-mode web
+ * search, both from a current Cursor build) showed Cursor no longer sends any
+ * tracing headers, and the Traceparent traffic seen in September carries a
+ * different Accept header (text/markdown;q=1.0, text/x-markdown;q=0.9, ...)
+ * plus B3 headers. So: with Cursor's Accept header it is reported as
+ * "Cursor (suspected)"; otherwise as a generic traced proxy agent.
+ */
+export const tracedProxyHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+  const ua = entry.headers?.['User-Agent'] || '';
+  if (!entry.headers?.['Traceparent'] || !ua.includes('Chrome/') || ua.includes('Code/')) {
+    return null;
+  }
+  if (normalizeAccept(entry.headers?.['Accept'] || '').startsWith(CURSOR_ACCEPT_PREFIX)) {
+    return {
+      isAgent: true,
+      name: CURSOR_PROXY_AGENT.suspectedName,
+      company: CURSOR_PROXY_AGENT.company,
+    };
+  }
+  return { isAgent: true, name: 'traced proxy agent', company: null };
+};
+
+/** @deprecated Renamed to tracedProxyHeuristic; kept as an alias. */
+export const cursorHeuristic: SignalHeuristic = tracedProxyHeuristic;
 
 /**
  * Chrome 122 / macOS 14.7.2 heuristic: frozen Chrome version and OS fingerprint
@@ -205,13 +266,34 @@ export const missingBrowserHeadersHeuristic: SignalHeuristic = (entry: SignalEnt
   return null;
 };
 
+/**
+ * Plain-text fetcher heuristic: a browser-like (Mozilla/) UA sending a bare
+ * `Accept: text/plain` header. No browser sends that Accept value; the
+ * combination indicates a fetcher hiding behind rotating browser UAs.
+ *
+ * Observed in September 2026 as a single llms.txt scanner that cycled through
+ * desktop and mobile browser UAs across many IPs while always sending exactly
+ * `Accept: text/plain`, `Accept-Encoding: gzip`, `Accept-Language: en-US` and
+ * `Cache-Control: no-cache`, and never sending `Sec-Ch-Ua`.
+ */
+export const plainTextFetcherHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+  const ua = entry.headers?.['User-Agent'] || '';
+  const accept = (entry.headers?.['Accept'] || '').trim();
+  if (!ua.startsWith('Mozilla/')) return null;
+  if (accept !== 'text/plain') return null;
+  if (entry.headers?.['Sec-Ch-Ua']) return null;
+  return { isAgent: true, name: 'plain-text fetcher (browser-masked)', company: null };
+};
+
 /** Default heuristics for signal-based agent detection (order matters: first match wins). */
 export const DEFAULT_HEURISTICS: SignalHeuristic[] = [
   chrome122Heuristic,
   sentryBaggageHeuristic,
-  cursorHeuristic,
+  cursorFetchHeuristic,
+  tracedProxyHeuristic,
   conversationTrackingHeuristic,
   markdownMimeHeuristic,
   acceptTaxonomyHeuristic,
   missingBrowserHeadersHeuristic,
+  plainTextFetcherHeuristic,
 ];

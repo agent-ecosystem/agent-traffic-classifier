@@ -25,7 +25,7 @@ describe('integration: full pipeline', () => {
       '2.2.2.2 - - [04/Apr/2026:10:00:01 -0700] "GET /about/ HTTP/1.1" 200 5000 "-" "GPTBot/1.0"',
       '3.3.3.3 - - [04/Apr/2026:10:00:02 -0700] "GET /style.css HTTP/1.1" 200 1000 "-" "Mozilla/5.0"',
       '4.4.4.4 - - [04/Apr/2026:10:00:03 -0700] "GET / HTTP/1.1" 200 3000 "-" "curl/7.68.0"',
-      '5.5.5.5 - - [04/Apr/2026:10:00:04 -0700] "GET /about/ HTTP/1.1" 200 5000 "-" "Claude-User/1.0"',
+      '5.5.5.5 - - [04/Apr/2026:10:00:04 -0700] "GET /about/ HTTP/1.1" 200 5000 "-" "Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)"',
     ];
 
     // Parse
@@ -38,7 +38,9 @@ describe('integration: full pipeline', () => {
         ip: '5.5.5.5',
         timestamp: toEpoch('2026-04-04T17:00:04Z'),
         domain: 'example.com',
-        headers: { 'User-Agent': 'Claude-User/1.0' },
+        headers: {
+          'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+        },
         trigger: 'content-negotiation',
       },
     ];

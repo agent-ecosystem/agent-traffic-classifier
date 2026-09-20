@@ -11,7 +11,72 @@
     "feed-reader": "Feed readers and news apps (user-initiated)"
   },
   "bots": [
-    { "pattern": "Code/", "name": "GitHub Copilot", "company": "Microsoft", "category": "agent" },
+    {
+      "pattern": "Code/",
+      "name": "GitHub Copilot",
+      "company": "Microsoft",
+      "category": "agent"
+    },
+    {
+      "pattern": "GitHubCopilotRuntime-WebFetch",
+      "name": "GitHub Copilot",
+      "company": "Microsoft",
+      "category": "agent"
+    },
+    {
+      "pattern": "ZCode-WebFetch",
+      "name": "ZCode",
+      "company": "ZCode",
+      "category": "agent"
+    },
+    {
+      "pattern": "qodercli/",
+      "name": "Qoder CLI",
+      "company": "Alibaba",
+      "category": "agent"
+    },
+    {
+      "pattern": "Qoder",
+      "name": "Qoder IDE",
+      "company": "Alibaba",
+      "category": "agent"
+    },
+    {
+      "pattern": "grok-agent",
+      "name": "Grok Agent",
+      "company": "xAI",
+      "category": "agent"
+    },
+    {
+      "pattern": "deepseek-harness",
+      "name": "DeepSeek Harness",
+      "company": "DeepSeek",
+      "category": "agent"
+    },
+    {
+      "pattern": "Claude/",
+      "name": "Claude Desktop",
+      "company": "Anthropic",
+      "category": "agent"
+    },
+    {
+      "pattern": "KimiDesktop/",
+      "name": "Kimi Desktop",
+      "company": "Moonshot",
+      "category": "agent"
+    },
+    {
+      "pattern": "WorkBuddy/",
+      "name": "WorkBuddy",
+      "company": "Tencent",
+      "category": "agent"
+    },
+    {
+      "pattern": "CodeBuddy",
+      "name": "CodeBuddy",
+      "company": "Tencent",
+      "category": "agent"
+    },
     {
       "pattern": "Google-Gemini-CLI",
       "name": "Gemini CLI",
@@ -19,10 +84,16 @@
       "category": "agent"
     },
     {
-      "pattern": "Claude-User",
+      "pattern": "claude-code/",
       "name": "Claude Code",
       "company": "Anthropic",
       "category": "agent"
+    },
+    {
+      "pattern": "Claude-User",
+      "name": "Claude-User",
+      "company": "Anthropic",
+      "category": "ai-assistant"
     },
     {
       "pattern": "Kiro-CLI",
@@ -48,8 +119,12 @@
       "company": null,
       "category": "agent"
     },
-
-    { "pattern": "GPTBot", "name": "GPTBot", "company": "OpenAI", "category": "ai-crawler" },
+    {
+      "pattern": "GPTBot",
+      "name": "GPTBot",
+      "company": "OpenAI",
+      "category": "ai-crawler"
+    },
     {
       "pattern": "ChatGPT-User",
       "name": "ChatGPT-User",
@@ -60,6 +135,12 @@
       "pattern": "OAI-SearchBot",
       "name": "OAI-SearchBot",
       "company": "OpenAI",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Claude-SearchBot",
+      "name": "Claude-SearchBot",
+      "company": "Anthropic",
       "category": "ai-search"
     },
     {
@@ -79,6 +160,12 @@
       "name": "Anthropic AI",
       "company": "Anthropic",
       "category": "ai-crawler"
+    },
+    {
+      "pattern": "Perplexity-User",
+      "name": "Perplexity-User",
+      "company": "Perplexity",
+      "category": "ai-assistant"
     },
     {
       "pattern": "PerplexityBot",
@@ -170,8 +257,18 @@
       "company": "Amazon",
       "category": "ai-crawler"
     },
-    { "pattern": "YouBot", "name": "YouBot", "company": "You.com", "category": "ai-search" },
-    { "pattern": "Diffbot", "name": "Diffbot", "company": "Diffbot", "category": "ai-crawler" },
+    {
+      "pattern": "YouBot",
+      "name": "YouBot",
+      "company": "You.com",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Diffbot",
+      "name": "Diffbot",
+      "company": "Diffbot",
+      "category": "ai-crawler"
+    },
     {
       "pattern": "TechDigest",
       "name": "TechDigest",
@@ -184,15 +281,24 @@
       "company": "LAION",
       "category": "ai-crawler"
     },
-    { "pattern": "Timpibot", "name": "Timpibot", "company": "Timpi", "category": "ai-search" },
+    {
+      "pattern": "Timpibot",
+      "name": "Timpibot",
+      "company": "Timpi",
+      "category": "ai-search"
+    },
     {
       "pattern": "JarvisSearch",
       "name": "JarvisSearch",
       "company": null,
       "category": "ai-search"
     },
-    { "pattern": "kagibot", "name": "Kagibot", "company": "Kagi", "category": "ai-search" },
-
+    {
+      "pattern": "kagibot",
+      "name": "Kagibot",
+      "company": "Kagi",
+      "category": "ai-search"
+    },
     {
       "pattern": "Googlebot",
       "name": "Googlebot",
@@ -218,6 +324,12 @@
       "category": "search-crawler"
     },
     {
+      "pattern": "Yandex",
+      "name": "Yandex",
+      "company": "Yandex",
+      "category": "search-crawler"
+    },
+    {
       "pattern": "DuckDuckBot",
       "name": "DuckDuckBot",
       "company": "DuckDuckGo",
@@ -229,14 +341,54 @@
       "company": "Apple",
       "category": "search-crawler"
     },
-
-    { "pattern": "AhrefsBot", "name": "AhrefsBot", "company": "Ahrefs", "category": "seo-bot" },
-    { "pattern": "SemrushBot", "name": "SemrushBot", "company": "Semrush", "category": "seo-bot" },
-    { "pattern": "MJ12bot", "name": "MJ12bot", "company": "Majestic", "category": "seo-bot" },
-    { "pattern": "DotBot", "name": "DotBot", "company": "Moz", "category": "seo-bot" },
-    { "pattern": "BLEXBot", "name": "BLEXBot", "company": "BLEXBot", "category": "seo-bot" },
-    { "pattern": "AwarioBot", "name": "AwarioBot", "company": "Awario", "category": "seo-bot" },
-
+    {
+      "pattern": "AhrefsBot",
+      "name": "AhrefsBot",
+      "company": "Ahrefs",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "SemrushBot",
+      "name": "SemrushBot",
+      "company": "Semrush",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "SEMrushBot",
+      "name": "SemrushBot",
+      "company": "Semrush",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "SiteAuditBot",
+      "name": "SiteAuditBot",
+      "company": "Semrush",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "MJ12bot",
+      "name": "MJ12bot",
+      "company": "Majestic",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "DotBot",
+      "name": "DotBot",
+      "company": "Moz",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "BLEXBot",
+      "name": "BLEXBot",
+      "company": "BLEXBot",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "AwarioBot",
+      "name": "AwarioBot",
+      "company": "Awario",
+      "category": "seo-bot"
+    },
     {
       "pattern": "UptimeRobot",
       "name": "UptimeRobot",
@@ -255,7 +407,6 @@
       "company": "StatusCake",
       "category": "monitoring"
     },
-
     {
       "pattern": "Twitterbot",
       "name": "Twitterbot",
@@ -310,7 +461,6 @@
       "company": "Meta",
       "category": "social-preview"
     },
-
     {
       "pattern": "HackerNews/",
       "name": "HackerNews App",
@@ -476,6 +626,504 @@
     {
       "pattern": "SecondBrain",
       "name": "SecondBrain",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "MistralAI-User",
+      "name": "MistralAI-User",
+      "company": "Mistral",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "DuckAssistBot",
+      "name": "DuckAssistBot",
+      "company": "DuckDuckGo",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "amazon-Quick",
+      "name": "Amazon Quick",
+      "company": "Amazon",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "amazon-QBusiness",
+      "name": "Amazon Q Business",
+      "company": "Amazon",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "Gemini-Deep-Research",
+      "name": "Gemini Deep Research",
+      "company": "Google",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "xAI-Grok",
+      "name": "xAI-Grok",
+      "company": "xAI",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "Keenable-User",
+      "name": "Keenable-User",
+      "company": "Keenable",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "Shap-User",
+      "name": "Shap-User",
+      "company": "Shap",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "ExaSearchBot",
+      "name": "ExaSearchBot",
+      "company": "Exa",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Cloudflare-AI-Search",
+      "name": "Cloudflare AI Search",
+      "company": "Cloudflare",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "AzureAI-SearchBot",
+      "name": "AzureAI-SearchBot",
+      "company": "Microsoft",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Kimi-SearchBot",
+      "name": "Kimi-SearchBot",
+      "company": "Moonshot",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "meta-webindexer",
+      "name": "Meta WebIndexer",
+      "company": "Meta",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "KeenableBot",
+      "name": "KeenableBot",
+      "company": "Keenable",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Aranet-SearchBot",
+      "name": "Aranet-SearchBot",
+      "company": "Aranet",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Querit-SearchBot",
+      "name": "Querit-SearchBot",
+      "company": "Querit",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "amazon-kendra",
+      "name": "Amazon Kendra",
+      "company": "Amazon",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "SSI-Nutch",
+      "name": "SSI Crawler",
+      "company": "Safe Superintelligence",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Reflectionbot",
+      "name": "Reflectionbot",
+      "company": "Reflection AI",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Hunyuan/",
+      "name": "Hunyuan",
+      "company": "Tencent",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "DeepSeekBot",
+      "name": "DeepSeekBot",
+      "company": "DeepSeek",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "KimiBot",
+      "name": "KimiBot",
+      "company": "Moonshot",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "MoonshotBot",
+      "name": "MoonshotBot",
+      "company": "Moonshot",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "GrokBot",
+      "name": "GrokBot",
+      "company": "xAI",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "PanguBot",
+      "name": "PanguBot",
+      "company": "Huawei",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Qwenbot",
+      "name": "Qwenbot",
+      "company": "Alibaba",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "YiBot",
+      "name": "YiBot",
+      "company": "01.AI",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "ChatGLM-Spider",
+      "name": "ChatGLM-Spider",
+      "company": "Zhipu AI",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "BeansLLM-CorpusBot",
+      "name": "BeansLLM-CorpusBot",
+      "company": null,
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "ShapBot",
+      "name": "ShapBot",
+      "company": "Shap",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "SeznamBot",
+      "name": "SeznamBot",
+      "company": "Seznam",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Sogou",
+      "name": "Sogou",
+      "company": "Sogou",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "PetalBot",
+      "name": "PetalBot",
+      "company": "Huawei",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Qwantbot",
+      "name": "Qwantbot",
+      "company": "Qwant",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "MojeekBot",
+      "name": "MojeekBot",
+      "company": "Mojeek",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "coccocbot",
+      "name": "CocCocBot",
+      "company": "Cốc Cốc",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "360Spider",
+      "name": "360Spider",
+      "company": "Qihoo 360",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "YisouSpider",
+      "name": "YisouSpider",
+      "company": "Alibaba",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Bravebot",
+      "name": "Bravebot",
+      "company": "Brave",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "AdsBot-Google",
+      "name": "AdsBot-Google",
+      "company": "Google",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "TikTokSpider",
+      "name": "TikTokSpider",
+      "company": "ByteDance",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "marginalia.nu",
+      "name": "Marginalia",
+      "company": "Marginalia",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "yacybot",
+      "name": "YaCy",
+      "company": null,
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Barkrowler",
+      "name": "Barkrowler",
+      "company": "Babbar",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "DataForSeoBot",
+      "name": "DataForSeoBot",
+      "company": "DataForSEO",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "SEOJuice",
+      "name": "SEOJuice",
+      "company": "SEOJuice",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "BuiltWith",
+      "name": "BuiltWith",
+      "company": "BuiltWith",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "PoweredByBot",
+      "name": "PoweredByBot",
+      "company": "Keywords Everywhere",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "Screaming Frog",
+      "name": "Screaming Frog",
+      "company": "Screaming Frog",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "BacklinkDiscovery",
+      "name": "BacklinkDiscovery",
+      "company": null,
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "PTST/",
+      "name": "WebPageTest",
+      "company": "Catchpoint",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "Chrome-Lighthouse",
+      "name": "Lighthouse",
+      "company": "Google",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "lychee/",
+      "name": "lychee",
+      "company": null,
+      "category": "monitoring"
+    },
+    {
+      "pattern": "OhDear",
+      "name": "Oh Dear",
+      "company": "Oh Dear",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "DreamHost Data Team",
+      "name": "DreamHost",
+      "company": "DreamHost",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "SkypeUriPreview",
+      "name": "Skype Preview",
+      "company": "Microsoft",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Iframely",
+      "name": "Iframely",
+      "company": "Iframely",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "LarkUrl",
+      "name": "Lark",
+      "company": "ByteDance",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Misskey/",
+      "name": "Misskey",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Akkoma",
+      "name": "Akkoma",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Pleroma",
+      "name": "Pleroma",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Iceshrimp/",
+      "name": "Iceshrimp",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Friendica/",
+      "name": "Friendica",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Catodon/",
+      "name": "Catodon",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "SummalyBot",
+      "name": "Summaly",
+      "company": null,
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Synapse (bot",
+      "name": "Matrix Synapse",
+      "company": "Matrix",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Mattermost-Bot",
+      "name": "Mattermost",
+      "company": "Mattermost",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "TelegramBot",
+      "name": "TelegramBot",
+      "company": "Telegram",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Zoombot",
+      "name": "Zoombot",
+      "company": "Zoom",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "HatchFeed",
+      "name": "HatchFeed",
+      "company": "Meta",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "Zapier",
+      "name": "Zapier",
+      "company": "Zapier",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Skyreader/",
+      "name": "Skyreader",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "KingfisherIngest",
+      "name": "Kingfisher",
+      "company": "TLDR Media",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Inoreader",
+      "name": "Inoreader",
+      "company": "Inoreader",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "NetNewsWire",
+      "name": "NetNewsWire",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Reeder/",
+      "name": "Reeder",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "RSS.Social",
+      "name": "RSS.Social",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "feeeed/",
+      "name": "feeeed",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Tapestry/",
+      "name": "Tapestry",
+      "company": "Iconfactory",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "feedparser/",
+      "name": "feedparser",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "rss-parser",
+      "name": "rss-parser",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "RSS Reader",
+      "name": "RSS Reader",
+      "company": null,
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Feed Aggregator",
+      "name": "Feed Aggregator",
       "company": null,
       "category": "feed-reader"
     }

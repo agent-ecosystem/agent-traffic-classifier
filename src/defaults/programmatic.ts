@@ -25,6 +25,11 @@ export const DEFAULT_PROGRAMMATIC: string[] = [
   'Bun/',
   'got (',
   'HeadlessChrome',
+  'PhantomJS',
+  'Lightpanda',
+  'Scrapy',
+  'HTTrack',
+  'Dalvik/',
 ];
 
 /**

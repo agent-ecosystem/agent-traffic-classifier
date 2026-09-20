@@ -178,21 +178,21 @@ const entry: LogEntry = {
 
 Every request is classified into one of these categories:
 
-| Category         | Description                                                                                         |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| `human`          | Regular browser traffic                                                                             |
-| `agent`          | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, MCP clients) |
-| `ai-crawler`     | AI training data crawlers (GPTBot, ClaudeBot, etc.)                                                 |
-| `ai-assistant`   | AI assistants fetching live content (ChatGPT-User, GoogleAgent-URLContext)                          |
-| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot, Kagibot)                                   |
-| `search-crawler` | Traditional search engines (Googlebot, Bingbot)                                                     |
-| `seo-bot`        | SEO/marketing bots (AhrefsBot, SemrushBot)                                                          |
-| `monitoring`     | Uptime monitors (UptimeRobot, Pingdom)                                                              |
-| `social-preview` | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                    |
-| `feed-reader`    | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                       |
-| `programmatic`   | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                     |
-| `other-bot`      | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list           |
-| `unknown`        | Empty or missing user-agent                                                                         |
+| Category         | Description                                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `human`          | Regular browser traffic                                                                                                                                                                                     |
+| `agent`          | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, Qoder, ZCode, grok-agent, MCP clients) and AI desktop apps' embedded browsers (Claude Desktop, WorkBuddy, CodeBuddy) |
+| `ai-crawler`     | AI training data crawlers (GPTBot, ClaudeBot, SSI-Nutch, DeepSeekBot, etc.)                                                                                                                                 |
+| `ai-assistant`   | AI assistants fetching live content on a user's behalf (ChatGPT-User, Claude-User, Perplexity-User, MistralAI-User, DuckAssistBot, Amazon Quick)                                                            |
+| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot, Claude-SearchBot, ExaSearchBot, Kagibot)                                                                                                           |
+| `search-crawler` | Traditional search engines (Googlebot, Bingbot)                                                                                                                                                             |
+| `seo-bot`        | SEO/marketing bots (AhrefsBot, SemrushBot)                                                                                                                                                                  |
+| `monitoring`     | Uptime monitors (UptimeRobot, Pingdom)                                                                                                                                                                      |
+| `social-preview` | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                                                                                                                            |
+| `feed-reader`    | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                                                                                                                               |
+| `programmatic`   | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                                                                                                                             |
+| `other-bot`      | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list                                                                                                                   |
+| `unknown`        | Empty or missing user-agent                                                                                                                                                                                 |
 
 Classification priority: curated bot list > programmatic client heuristic > isbot fallback > human.
 
@@ -200,18 +200,27 @@ Classification priority: curated bot list > programmatic client heuristic > isbo
 
 When HTTP header signals are available, the library applies a chain of heuristics to identify agents that use standard browser user-agents. The chain is ordered by specificity (first match wins):
 
-1. **Known agent UAs**: Claude Code (`Claude-User`), Claude Agent (`Claude-Agent`), Gemini CLI (`Google-Gemini-CLI`), markdown.new
+1. **Known agent UAs**: Claude Code (`claude-code/`), Claude Agent (`Claude-Agent`), Gemini CLI (`Google-Gemini-CLI`), markdown.new
 2. **Dev tool exclusion**: curl and other known developer tools are excluded from agent classification
-3. **Chrome 122 / macOS 14.7.2**: Frozen browser fingerprint used by Chinese AI assistant services. With CN country IP, returns "Kimi / Doubao / DeepSeek (suspected)"
-4. **Cursor (Sentry Baggage)**: Definitively identifies Cursor via its Sentry org credentials leaked in the `Baggage` header
-5. **Cursor (Traceparent)**: Generic Chrome UA with OpenTelemetry tracing headers, excluding VS Code
-6. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
-7. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
-8. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, Cursor, got-pattern, markdown variants)
-9. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
-10. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
+3. **Curated bot database**: The same bot database the access-log classifier uses. Self-identifying coding agents (category `agent`, e.g. `GitHubCopilotRuntime-WebFetch`, VS Code's `Code/` token, `grok-agent`) are agents. Self-identifying crawlers, assistants, search bots and feed readers are never agents, even when they request `llms.txt` or negotiate for markdown, so GPTBot, ClaudeBot, bingbot and ExaSearchBot no longer seed "unidentified" agent sessions. Pass `botClassifier: null` to disable.
+4. **Chrome 122 / macOS 14.7.2**: Frozen browser fingerprint used by Chinese AI assistant services. With CN country IP, returns "Kimi / Doubao / DeepSeek (suspected)"
+5. **Cursor (Sentry Baggage)**: Definitively identifies Cursor via its Sentry org credentials leaked in the `Baggage` header (seen April 2026, absent by September 2026)
+6. **Cursor (fetch fingerprint)**: Generic Chrome UA with Cursor's markdown-first Accept header, `Pragma: no-cache`, `Cache-Control: no-cache`, and no `Sec-Ch-Ua`. Confirmed by controlled tests in April and September 2026
+7. **Traced proxy**: Generic Chrome UA with OpenTelemetry `Traceparent` headers, excluding VS Code. A server-side fetch pipeline of some kind. Reported as "Cursor (suspected)" only when paired with Cursor's Accept header (the April 2026 combination), otherwise as "traced proxy agent"
+8. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
+9. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
+10. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, html-first, Cursor, got-pattern, markdown variants)
+11. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
+12. **Plain-text fetcher**: Browser-like UA sending a bare `Accept: text/plain` with no `Sec-Ch-Ua`. No browser does this; observed as an `llms.txt` scanner rotating through browser UAs
+13. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
 
 All heuristics are exported individually so you can reorder, replace, or extend the chain.
+
+Cursor's fetch fingerprint was re-confirmed on 2026-09-19 by two controlled tests against a quiet tracked site from a current Cursor build: a direct URL fetch, and an Agent-mode web search that led Cursor to fetch several pages. Both paths produced the same requests: each from a different proxy IP with a generic Chrome/145 UA, Cursor's markdown-first Accept header, `Pragma`/`Cache-Control: no-cache`, and no `Sec-Ch-Ua`, tracing, or Sentry headers. The web searches themselves generated no requests to the site; only the follow-up page fetches did. Exa's crawler (`ExaSearchBot`) sends the identical fingerprint with a self-identifying UA, consistent with Cursor's fetch running on Exa infrastructure; the bot database routes ExaSearchBot to `ai-search` before the heuristics run. Traffic carrying `Traceparent` and `B3` tracing headers with a `text/markdown;q=1.0, text/x-markdown;q=0.9, ...` Accept was labelled Cursor in April 2026 because it co-occurred with the Sentry header, but neither September test reproduced it, so it is now reported as a generic "traced proxy agent".
+
+### Auditing the defaults against real logs
+
+The `scripts/` directory has two scripts that run a directory of access logs and signal logs through the current build and print what the defaults miss (uncategorized bots, unmatched signal fingerprints, new request headers). See [scripts/README.md](scripts/README.md) for the expected log layout and how to read the output.
 
 ## IP intelligence
 

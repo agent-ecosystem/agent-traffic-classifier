@@ -85,6 +85,14 @@ export interface FilterOptions {
 export interface SignalClassifierOptions {
   knownAgents?: Array<{ pattern: string; name: string; company: string }>;
   devTools?: string[];
+  /**
+   * User-agent classifier consulted before the header heuristics run. Self-identifying
+   * coding agents (category `agent`) are treated as agents; self-identifying crawlers,
+   * assistants, search bots, feed readers, etc. are never treated as agents, even when
+   * they hit agent triggers such as llms.txt. Defaults to `createClassifier()`.
+   * Pass `null` to disable.
+   */
+  botClassifier?: ((userAgent: string) => ClassifyResult) | null;
   agentTriggers?: Set<string>;
   heuristics?: SignalHeuristic[];
   ipLookup?: IpLookup;

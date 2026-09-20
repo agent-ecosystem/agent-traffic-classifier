@@ -91,12 +91,16 @@ export {
   SUSPECTED_AGENTS,
   DEFAULT_ACCEPT_TAXONOMY,
   sentryBaggageHeuristic,
+  cursorFetchHeuristic,
+  tracedProxyHeuristic,
   cursorHeuristic,
+  CURSOR_ACCEPT_PREFIX,
   chrome122Heuristic,
   conversationTrackingHeuristic,
   markdownMimeHeuristic,
   acceptTaxonomyHeuristic,
   missingBrowserHeadersHeuristic,
+  plainTextFetcherHeuristic,
 } from './defaults/agents.js';
 export type { AcceptPattern } from './defaults/agents.js';
 export {

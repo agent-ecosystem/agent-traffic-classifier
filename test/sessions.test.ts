@@ -32,7 +32,7 @@ function makeSignalEntry(overrides: Partial<SignalEntry> = {}): SignalEntry {
     ip: '1.2.3.4',
     timestamp: toEpoch('2026-04-04T07:36:43Z'),
     domain: 'example.com',
-    headers: { 'User-Agent': 'Claude-User/1.0' },
+    headers: { 'User-Agent': 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)' },
     trigger: 'content-negotiation',
     ...overrides,
   };
@@ -91,7 +91,11 @@ describe('reclassifyEntries', () => {
     const seeds = buildAgentSeeds(signalEntries, classifySignalEntry);
     const domainSeeds = seeds.get('example.com')!;
 
-    const logEntries = [makeLogEntry({ userAgent: 'Claude-User/1.0' })];
+    const logEntries = [
+      makeLogEntry({
+        userAgent: 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+      }),
+    ];
     const result = reclassifyEntries(logEntries, domainSeeds, classify);
     expect(result[0].classification.category).toBe('agent');
     expect(result[0].classification.botName).toBe('Claude Code');
@@ -140,11 +144,11 @@ describe('reclassifyEntries', () => {
     const logEntries = [
       makeLogEntry({
         timestamp: toEpoch('2026-04-04T07:37:00Z'),
-        userAgent: 'Claude-User/1.0',
+        userAgent: 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
       }),
       makeLogEntry({
         timestamp: toEpoch('2026-04-04T07:37:50Z'),
-        userAgent: 'Claude-User/1.0',
+        userAgent: 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
       }),
     ];
     const result = reclassifyEntries(logEntries, domainSeeds, classify);
@@ -226,11 +230,19 @@ describe('detectDuplicateRequestAgents', () => {
   it('skips known non-proxy agents like Claude Code', () => {
     const entries: ClassifiedEntry[] = [
       {
-        entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Claude-User/1.0' }),
+        entry: makeLogEntry({
+          ip: '1.1.1.1',
+          path: '/page',
+          userAgent: 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+        }),
         classification: { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
       },
       {
-        entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Claude-User/1.0' }),
+        entry: makeLogEntry({
+          ip: '2.2.2.2',
+          path: '/page',
+          userAgent: 'Claude-User (claude-code/2.1.270; +https://support.anthropic.com/)',
+        }),
         classification: { category: 'agent', botName: 'Claude Code', botCompany: 'Anthropic' },
       },
     ];

@@ -11,8 +11,28 @@ import {
   DEFAULT_AGENT_TRIGGERS,
   DEFAULT_HEURISTICS,
 } from './defaults/agents.js';
+import { createClassifier } from './classify.js';
 import { extractDateKey } from './date.js';
-import { UNIDENTIFIED_AGENT } from './defaults/categories.js';
+import {
+  CATEGORY_AGENT,
+  CATEGORY_HUMAN,
+  CATEGORY_OTHER_BOT,
+  CATEGORY_PROGRAMMATIC,
+  CATEGORY_UNKNOWN,
+  UNIDENTIFIED_AGENT,
+} from './defaults/categories.js';
+
+/**
+ * Categories the bot classifier assigns when the UA is NOT in the curated bot
+ * database. Entries in these categories fall through to the header heuristics;
+ * everything else is a self-identifying bot whose category settles the question.
+ */
+const UNCURATED_CATEGORIES = new Set([
+  CATEGORY_HUMAN,
+  CATEGORY_UNKNOWN,
+  CATEGORY_PROGRAMMATIC,
+  CATEGORY_OTHER_BOT,
+]);
 
 /**
  * Create signal classification functions for detecting agents from HTTP header data.
@@ -32,6 +52,8 @@ export function createSignalClassifier(options?: SignalClassifierOptions): {
   const agentTriggers = options?.agentTriggers ?? DEFAULT_AGENT_TRIGGERS;
   const heuristics = options?.heuristics ?? DEFAULT_HEURISTICS;
   const ipLookup = options?.ipLookup;
+  const botClassifier =
+    options?.botClassifier === null ? null : (options?.botClassifier ?? createClassifier());
 
   function classifySignalEntry(entry: SignalEntry): SignalClassifyResult {
     const ua = entry.headers?.['User-Agent'] || '';
@@ -47,6 +69,22 @@ export function createSignalClassifier(options?: SignalClassifierOptions): {
     const uaLower = ua.toLowerCase();
     for (const tool of devTools) {
       if (uaLower.includes(tool.toLowerCase())) {
+        return { isAgent: false };
+      }
+    }
+
+    // Consult the curated bot database. Self-identifying coding agents are agents.
+    // Self-identifying crawlers, assistants, search bots, feed readers, etc. are
+    // not, even when they request llms.txt or negotiate for markdown: without
+    // this check, GPTBot, ClaudeBot, bingbot and friends hitting llms.txt would
+    // seed "unidentified" agent sessions and pull their access-log traffic out
+    // of the ai-crawler / search-crawler categories.
+    if (botClassifier) {
+      const bot = botClassifier(ua);
+      if (bot.category === CATEGORY_AGENT) {
+        return { isAgent: true, name: bot.botName ?? UNIDENTIFIED_AGENT, company: bot.botCompany };
+      }
+      if (!UNCURATED_CATEGORIES.has(bot.category)) {
         return { isAgent: false };
       }
     }
