@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/) with 0.x semantics: minor versions may change classification behavior.
 
-## [Unreleased]
+## [0.4.0] - 2026-09-20
 
 ### Added
 
@@ -74,6 +74,7 @@ Based on an audit of a week of live traffic (September 11 to 19, 2026) across tw
 
 - Initial release: Apache log parsing, user-agent classification with a curated bot database, programmatic client detection, isbot fallback, signal-based agent heuristics, IP intelligence adapters, session clustering, duplicate-request proxy detection, and daily aggregation.
 
+[0.4.0]: https://github.com/agent-ecosystem/agent-traffic-classifier/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/agent-ecosystem/agent-traffic-classifier/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/agent-ecosystem/agent-traffic-classifier/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/agent-ecosystem/agent-traffic-classifier/compare/v0.1.1...v0.1.2
