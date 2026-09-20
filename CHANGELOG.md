@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/) with 0.x semantics: minor versions may change classification behavior.
 
+## [Unreleased]
+
+### Added
+
+- `spoofedBrowserHeuristic` (first in the default chain): flags requests whose client hints contradict their user agent (Firefox or Safari UA with `Sec-Ch-Ua`; Chrome UA whose major disagrees with its hints). Returns a non-agent result in the new `spoofed-browser` category.
+- `detectSpoofedBrowsers`: demotes human-category IP+UA pairs that never load assets, never send a same-site referrer, have two or more requests, and run a browser version far behind the newest asset-loading session of the same family (thresholds per family; reference versions self-calibrate from the corpus or can be supplied). Single-request pairs and current versions are never touched.
+- `crossReferenceAgentIps`: attributes programmatic requests to a self-identifying agent active from the same IP within a window (default 15 minutes), across user agents and domains. Captures coding agents shelling out to curl. Only ever touches `programmatic` entries.
+- `parseBrowserVersion`, `DEFAULT_STALE_MAJORS`, `DEFAULT_AGENT_IP_WINDOW_SECONDS`, `CATEGORY_SPOOFED_BROWSER`, `SPOOFED_BROWSER_NAME`.
+- `spoofed-browser` is in `DEFAULT_TOP_PATHS_SKIP_CATEGORIES`.
+- Bot database: PipericBot (seo-bot).
+
+### Changed
+
+- **`crossReferenceSignalIps` now applies a time window** (default 15 minutes, `windowSeconds` option; pass `Infinity` for the old behaviour). Previously any programmatic request from an IP that produced an agent signal that day was upgraded, regardless of elapsed time, which attributed unrelated curl activity from a developer's own address to an agent that had run hours earlier. On nine days of real logs the window keeps 160 of 171 upgrades; the 11 dropped were all hours apart from their anchor.
+- `SignalClassifyResult` and `AgentSeed` gained an optional `category`. `buildAgentSeeds` now seeds sessions for non-agent results that carry a category, and `reclassifyEntries` applies the seed's category (still `agent` for agents).
+- README documents the shared-IP design constraints for session functions and how to keep internal tools (site checkers, CI probes) from seeding agent sessions via `devTools`.
+
 ## [0.3.0] - 2026-09-20
 
 Based on an audit of a week of live traffic (September 11 to 19, 2026) across twelve sites, plus two controlled tests of Cursor's fetch behavior.

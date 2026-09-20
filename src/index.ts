@@ -26,6 +26,10 @@ export type {
   ProgrammaticStat,
   AgentStat,
   DaySummary,
+  IpCorrelationOptions,
+  CrossReferenceAgentIpsOptions,
+  SpoofedBrowserOptions,
+  BrowserFamily,
 } from './types.js';
 
 // Apache adapter (convenience layer for Apache Combined Log Format)
@@ -73,6 +77,11 @@ export {
   reclassifyEntries,
   detectDuplicateRequestAgents,
   crossReferenceSignalIps,
+  crossReferenceAgentIps,
+  detectSpoofedBrowsers,
+  parseBrowserVersion,
+  DEFAULT_AGENT_IP_WINDOW_SECONDS,
+  DEFAULT_STALE_MAJORS,
 } from './sessions.js';
 
 // Date utilities
@@ -101,6 +110,8 @@ export {
   acceptTaxonomyHeuristic,
   missingBrowserHeadersHeuristic,
   plainTextFetcherHeuristic,
+  spoofedBrowserHeuristic,
+  SPOOFED_BROWSER_NAME,
 } from './defaults/agents.js';
 export type { AcceptPattern } from './defaults/agents.js';
 export {
@@ -124,6 +135,7 @@ export {
   CATEGORY_PROGRAMMATIC,
   CATEGORY_OTHER_BOT,
   CATEGORY_AGENT,
+  CATEGORY_SPOOFED_BROWSER,
   CATEGORY_FEED_READER,
   AI_CATEGORY_PREFIX,
   UNIDENTIFIED_AGENT,

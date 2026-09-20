@@ -178,21 +178,22 @@ const entry: LogEntry = {
 
 Every request is classified into one of these categories:
 
-| Category         | Description                                                                                                                                                                                                 |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `human`          | Regular browser traffic                                                                                                                                                                                     |
-| `agent`          | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, Qoder, ZCode, grok-agent, MCP clients) and AI desktop apps' embedded browsers (Claude Desktop, WorkBuddy, CodeBuddy) |
-| `ai-crawler`     | AI training data crawlers (GPTBot, ClaudeBot, SSI-Nutch, DeepSeekBot, etc.)                                                                                                                                 |
-| `ai-assistant`   | AI assistants fetching live content on a user's behalf (ChatGPT-User, Claude-User, Perplexity-User, MistralAI-User, DuckAssistBot, Amazon Quick)                                                            |
-| `ai-search`      | AI-powered search engines (PerplexityBot, OAI-SearchBot, Claude-SearchBot, ExaSearchBot, Kagibot)                                                                                                           |
-| `search-crawler` | Traditional search engines (Googlebot, Bingbot)                                                                                                                                                             |
-| `seo-bot`        | SEO/marketing bots (AhrefsBot, SemrushBot)                                                                                                                                                                  |
-| `monitoring`     | Uptime monitors (UptimeRobot, Pingdom)                                                                                                                                                                      |
-| `social-preview` | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                                                                                                                            |
-| `feed-reader`    | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                                                                                                                               |
-| `programmatic`   | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                                                                                                                             |
-| `other-bot`      | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list                                                                                                                   |
-| `unknown`        | Empty or missing user-agent                                                                                                                                                                                 |
+| Category          | Description                                                                                                                                                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `human`           | Regular browser traffic                                                                                                                                                                                     |
+| `agent`           | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, Qoder, ZCode, grok-agent, MCP clients) and AI desktop apps' embedded browsers (Claude Desktop, WorkBuddy, CodeBuddy) |
+| `ai-crawler`      | AI training data crawlers (GPTBot, ClaudeBot, SSI-Nutch, DeepSeekBot, etc.)                                                                                                                                 |
+| `ai-assistant`    | AI assistants fetching live content on a user's behalf (ChatGPT-User, Claude-User, Perplexity-User, MistralAI-User, DuckAssistBot, Amazon Quick)                                                            |
+| `ai-search`       | AI-powered search engines (PerplexityBot, OAI-SearchBot, Claude-SearchBot, ExaSearchBot, Kagibot)                                                                                                           |
+| `search-crawler`  | Traditional search engines (Googlebot, Bingbot)                                                                                                                                                             |
+| `seo-bot`         | SEO/marketing bots (AhrefsBot, SemrushBot)                                                                                                                                                                  |
+| `monitoring`      | Uptime monitors (UptimeRobot, Pingdom)                                                                                                                                                                      |
+| `social-preview`  | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                                                                                                                            |
+| `feed-reader`     | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                                                                                                                               |
+| `programmatic`    | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                                                                                                                             |
+| `spoofed-browser` | Automation wearing a browser user agent that does not behave like one. Never assigned by user agent alone; see `detectSpoofedBrowsers` and the spoofed-header heuristic                                     |
+| `other-bot`       | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list                                                                                                                   |
+| `unknown`         | Empty or missing user-agent                                                                                                                                                                                 |
 
 Classification priority: curated bot list > programmatic client heuristic > isbot fallback > human.
 
@@ -202,17 +203,18 @@ When HTTP header signals are available, the library applies a chain of heuristic
 
 1. **Known agent UAs**: Claude Code (`claude-code/`), Claude Agent (`Claude-Agent`), Gemini CLI (`Google-Gemini-CLI`), markdown.new
 2. **Dev tool exclusion**: curl and other known developer tools are excluded from agent classification
-3. **Curated bot database**: The same bot database the access-log classifier uses. Self-identifying coding agents (category `agent`, e.g. `GitHubCopilotRuntime-WebFetch`, VS Code's `Code/` token, `grok-agent`) are agents. Self-identifying crawlers, assistants, search bots and feed readers are never agents, even when they request `llms.txt` or negotiate for markdown, so GPTBot, ClaudeBot, bingbot and ExaSearchBot no longer seed "unidentified" agent sessions. Pass `botClassifier: null` to disable.
-4. **Chrome 122 / macOS 14.7.2**: Frozen browser fingerprint used by Chinese AI assistant services. With CN country IP, returns "Kimi / Doubao / DeepSeek (suspected)"
-5. **Cursor (Sentry Baggage)**: Definitively identifies Cursor via its Sentry org credentials leaked in the `Baggage` header (seen April 2026, absent by September 2026)
-6. **Cursor (fetch fingerprint)**: Generic Chrome UA with Cursor's markdown-first Accept header, `Pragma: no-cache`, `Cache-Control: no-cache`, and no `Sec-Ch-Ua`. Confirmed by controlled tests in April and September 2026
-7. **Traced proxy**: Generic Chrome UA with OpenTelemetry `Traceparent` headers, excluding VS Code. A server-side fetch pipeline of some kind. Reported as "Cursor (suspected)" only when paired with Cursor's Accept header (the April 2026 combination), otherwise as "traced proxy agent"
-8. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
-9. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
-10. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, html-first, Cursor, got-pattern, markdown variants)
-11. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
-12. **Plain-text fetcher**: Browser-like UA sending a bare `Accept: text/plain` with no `Sec-Ch-Ua`. No browser does this; observed as an `llms.txt` scanner rotating through browser UAs
-13. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
+3. **Spoofed browser headers**: A Firefox or Safari user agent carrying `Sec-Ch-Ua` (neither browser sends client hints), or a Chrome user agent whose major version disagrees with its own client hints. Returns a non-agent result in the `spoofed-browser` category; session attribution relabels the matching IP+UA traffic without counting it as an agent
+4. **Curated bot database**: The same bot database the access-log classifier uses. Self-identifying coding agents (category `agent`, e.g. `GitHubCopilotRuntime-WebFetch`, VS Code's `Code/` token, `grok-agent`) are agents. Self-identifying crawlers, assistants, search bots and feed readers are never agents, even when they request `llms.txt` or negotiate for markdown, so GPTBot, ClaudeBot, bingbot and ExaSearchBot no longer seed "unidentified" agent sessions. Pass `botClassifier: null` to disable.
+5. **Chrome 122 / macOS 14.7.2**: Frozen browser fingerprint used by Chinese AI assistant services. With CN country IP, returns "Kimi / Doubao / DeepSeek (suspected)"
+6. **Cursor (Sentry Baggage)**: Definitively identifies Cursor via its Sentry org credentials leaked in the `Baggage` header (seen April 2026, absent by September 2026)
+7. **Cursor (fetch fingerprint)**: Generic Chrome UA with Cursor's markdown-first Accept header, `Pragma: no-cache`, `Cache-Control: no-cache`, and no `Sec-Ch-Ua`. Confirmed by controlled tests in April and September 2026
+8. **Traced proxy**: Generic Chrome UA with OpenTelemetry `Traceparent` headers, excluding VS Code. A server-side fetch pipeline of some kind. Reported as "Cursor (suspected)" only when paired with Cursor's Accept header (the April 2026 combination), otherwise as "traced proxy agent"
+9. **Conversation tracking headers**: `X-Conversation-Id` or `X-Conversation-Request-Id` are definitively agent headers
+10. **text/x-markdown Accept**: The unofficial markdown MIME type is only sent by purpose-built agents
+11. **Accept header taxonomy**: Known Accept preference patterns that identify agent frameworks (axios-pattern, text-first, html-first, Cursor, got-pattern, markdown variants)
+12. **Missing browser headers**: Chrome UA requesting markdown without `Sec-Ch-Ua` (a header real Chrome always sends)
+13. **Plain-text fetcher**: Browser-like UA sending a bare `Accept: text/plain` with no `Sec-Ch-Ua`. No browser does this; observed as an `llms.txt` scanner rotating through browser UAs
+14. **Trigger-based fallback**: Requests with agent triggers (`content-negotiation`, `llms-txt`) but no heuristic match are classified as "unidentified"
 
 All heuristics are exported individually so you can reorder, replace, or extend the chain.
 
@@ -320,6 +322,20 @@ const { classifySignalEntry, getSignalSummary } = createSignalClassifier({
 });
 ```
 
+### Internal tools that negotiate for markdown
+
+Site checkers, CI probes, and other tools you run yourself will trip the signal tracker if they send `Accept: text/markdown` or fetch `llms.txt`. Without a curated entry they fall through to the heuristics and seed "unidentified" agent sessions that then absorb all of the tool's access-log traffic. List them in `devTools` so they are never promoted, and give the same classifier to `botClassifier` so both sides agree:
+
+```ts
+const classify = createClassifier({
+  programmaticClients: ['my-checker/', ...DEFAULT_PROGRAMMATIC],
+});
+const { classifySignalEntry } = createSignalClassifier({
+  devTools: ['my-checker/', ...DEFAULT_DEV_TOOLS],
+  botClassifier: classify,
+});
+```
+
 ### Session options
 
 ```ts
@@ -384,11 +400,16 @@ const docs = aggregate(classified, {
 
 ### Sessions
 
+Two constraints govern every function here that uses IP evidence: human-category browser requests are never moved to another category on IP evidence alone (one person on an office VPN running an agent must not relabel everyone else's browsing), and per-request or per-pair evidence is preferred over per-IP evidence wherever both exist.
+
 - **`buildSessionProfiles(entries, domain)`** -- Build per-IP session profiles (static assets, self-site referrers) for false-positive suppression
 - **`buildAgentSeeds(signalEntries, classifySignalEntry)`** -- Build agent seeds grouped by domain
 - **`reclassifyEntries(entries, domainSeeds, classifyFn, options?)`** -- Reclassify access log entries using signal seeds
 - **`detectDuplicateRequestAgents(entries, options?)`** -- Detect proxy-based agents via duplicate-request heuristic
-- **`crossReferenceSignalIps(entries, signalEntries, domain, classifySignalEntry)`** -- Upgrade programmatic entries to agent when their IP appears in signal data
+- **`crossReferenceSignalIps(entries, signalEntries, domain, classifySignalEntry, options?)`** -- Upgrade programmatic entries to agent when their IP produced an agent signal on the same domain within a window (default 15 minutes; any agent signal counts, named agents preferred over "unidentified")
+- **`crossReferenceAgentIps(entries, signalEntries, classifySignalEntry, options?)`** -- Attribute programmatic requests (curl and friends) to a self-identifying agent active from the same IP within a short window (default 15 minutes), across user agents and domains. Only ever touches `programmatic` entries
+- **`detectSpoofedBrowsers(entries, domain, options?)`** -- Demote browser-UA traffic that never loads assets, never navigates with a same-site referrer, has two or more requests, and runs a browser version far behind the newest asset-loading session of the same family. Single-request pairs and current versions are never touched
+- **`parseBrowserVersion(userAgent)`** -- Browser family and major version for mainstream browser UAs, null otherwise
 
 ### IP intelligence
 
