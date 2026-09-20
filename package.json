@@ -1,6 +1,6 @@
 {
   "name": "agent-traffic-classifier",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Classify web traffic into humans, bots, AI agents, and programmatic clients from access logs and HTTP header signals",
   "type": "module",
   "main": "dist/index.js",
