@@ -406,7 +406,7 @@ Two constraints govern every function here that uses IP evidence: human-category
 - **`buildAgentSeeds(signalEntries, classifySignalEntry)`** -- Build agent seeds grouped by domain
 - **`reclassifyEntries(entries, domainSeeds, classifyFn, options?)`** -- Reclassify access log entries using signal seeds
 - **`detectDuplicateRequestAgents(entries, options?)`** -- Detect proxy-based agents via duplicate-request heuristic
-- **`crossReferenceSignalIps(entries, signalEntries, domain, classifySignalEntry)`** -- Upgrade programmatic entries to agent when their IP appears in signal data for the same domain
+- **`crossReferenceSignalIps(entries, signalEntries, domain, classifySignalEntry, options?)`** -- Upgrade programmatic entries to agent when their IP produced an agent signal on the same domain within a window (default 15 minutes; any agent signal counts, named agents preferred over "unidentified")
 - **`crossReferenceAgentIps(entries, signalEntries, classifySignalEntry, options?)`** -- Attribute programmatic requests (curl and friends) to a self-identifying agent active from the same IP within a short window (default 15 minutes), across user agents and domains. Only ever touches `programmatic` entries
 - **`detectSpoofedBrowsers(entries, domain, options?)`** -- Demote browser-UA traffic that never loads assets, never navigates with a same-site referrer, has two or more requests, and runs a browser version far behind the newest asset-loading session of the same family. Single-request pairs and current versions are never touched
 - **`parseBrowserVersion(userAgent)`** -- Browser family and major version for mainstream browser UAs, null otherwise

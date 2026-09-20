@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **`crossReferenceSignalIps` now applies a time window** (default 15 minutes, `windowSeconds` option; pass `Infinity` for the old behaviour). Previously any programmatic request from an IP that produced an agent signal that day was upgraded, regardless of elapsed time, which attributed unrelated curl activity from a developer's own address to an agent that had run hours earlier. On nine days of real logs the window keeps 160 of 171 upgrades; the 11 dropped were all hours apart from their anchor.
 - `SignalClassifyResult` and `AgentSeed` gained an optional `category`. `buildAgentSeeds` now seeds sessions for non-agent results that carry a category, and `reclassifyEntries` applies the seed's category (still `agent` for agents).
 - README documents the shared-IP design constraints for session functions and how to keep internal tools (site checkers, CI probes) from seeding agent sessions via `devTools`.
 

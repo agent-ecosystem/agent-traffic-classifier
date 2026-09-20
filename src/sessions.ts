@@ -3,7 +3,7 @@ import type {
   BrowserFamily,
   ClassifiedEntry,
   ClassifyResult,
-  CrossReferenceAgentIpsOptions,
+  IpCorrelationOptions,
   LogEntry,
   SessionOptions,
   SessionProfile,
@@ -323,13 +323,22 @@ export function detectDuplicateRequestAgents(
 }
 
 /**
- * Cross-reference programmatic client IPs with agent signal IPs.
+ * Cross-reference programmatic client IPs with agent signal IPs on the same domain.
  *
- * If a programmatic entry (e.g., python-httpx, undici) comes from the same IP
- * that also appears in agent signal data, the programmatic traffic is likely
- * driven by the same agent. This upgrades the entry from "programmatic" to "agent".
+ * If a programmatic entry (e.g., python-httpx, undici, curl) comes from the same
+ * IP as an agent signal on this domain within `windowSeconds` (default 15
+ * minutes), the programmatic traffic is attributed to that agent and upgraded
+ * from "programmatic" to "agent". Any agent signal counts as an anchor here,
+ * including heuristic-only and "unidentified" results; named agents are
+ * preferred over "unidentified" when both are in range.
  *
- * The agent name is taken from the best signal classification for that IP.
+ * Shared-IP safety: only `programmatic` entries are touched, never human
+ * browser traffic, and the window keeps a day's worth of unrelated activity
+ * from one address from being attributed to an agent that ran hours earlier.
+ * Pass `windowSeconds: Infinity` for the pre-0.4 unbounded behaviour.
+ *
+ * See also `crossReferenceAgentIps`, which uses only self-identifying agents
+ * as anchors but correlates across domains and user agents.
  * Run this after reclassifyEntries and detectDuplicateRequestAgents.
  */
 export function crossReferenceSignalIps(
@@ -337,39 +346,47 @@ export function crossReferenceSignalIps(
   signalEntries: SignalEntry[],
   domain: string,
   classifySignalEntry: (entry: SignalEntry) => SignalClassifyResult,
+  options?: IpCorrelationOptions,
 ): ClassifiedEntry[] {
-  // Build IP → best agent name map from signal entries for this domain
-  const ipAgents = new Map<string, { name: string; company: string | null }>();
+  const windowSeconds = options?.windowSeconds ?? DEFAULT_AGENT_IP_WINDOW_SECONDS;
 
+  // IP -> agent signal anchors on this domain
+  const anchors = new Map<string, Array<{ ts: number; name: string; company: string | null }>>();
   for (const entry of signalEntries) {
     if (entry.domain !== domain) continue;
     const cls = classifySignalEntry(entry);
     if (!cls.isAgent) continue;
-
-    const name = cls.name ?? UNIDENTIFIED_AGENT;
-    const existing = ipAgents.get(entry.ip);
-
-    // Prefer named agents over "unidentified"
-    if (!existing || (existing.name === UNIDENTIFIED_AGENT && name !== UNIDENTIFIED_AGENT)) {
-      ipAgents.set(entry.ip, { name, company: cls.company ?? null });
-    }
+    if (!anchors.has(entry.ip)) anchors.set(entry.ip, []);
+    anchors.get(entry.ip)!.push({
+      ts: entry.timestamp,
+      name: cls.name ?? UNIDENTIFIED_AGENT,
+      company: cls.company ?? null,
+    });
   }
-
-  if (ipAgents.size === 0) return classifiedEntries;
+  if (anchors.size === 0) return classifiedEntries;
 
   return classifiedEntries.map((item) => {
     if (item.classification.category !== CATEGORY_PROGRAMMATIC) return item;
-
-    const agent = ipAgents.get(item.entry.ip);
-    if (!agent) return item;
-
+    const list = anchors.get(item.entry.ip);
+    if (!list) return item;
+    const ts = item.entry.timestamp;
+    let best: { ts: number; name: string; company: string | null } | null = null;
+    for (const a of list) {
+      if (Math.abs(a.ts - ts) > windowSeconds) continue;
+      if (!best) {
+        best = a;
+        continue;
+      }
+      // Prefer named agents over "unidentified"; among equals, prefer the nearest.
+      const bestNamed = best.name !== UNIDENTIFIED_AGENT;
+      const aNamed = a.name !== UNIDENTIFIED_AGENT;
+      if (aNamed && !bestNamed) best = a;
+      else if (aNamed === bestNamed && Math.abs(a.ts - ts) < Math.abs(best.ts - ts)) best = a;
+    }
+    if (!best) return item;
     return {
       entry: item.entry,
-      classification: {
-        category: CATEGORY_AGENT,
-        botName: agent.name,
-        botCompany: agent.company,
-      },
+      classification: { category: CATEGORY_AGENT, botName: best.name, botCompany: best.company },
     };
   });
 }
@@ -394,7 +411,7 @@ export function crossReferenceAgentIps(
   classifiedEntries: ClassifiedEntry[],
   signalEntries: SignalEntry[],
   classifySignalEntry: (entry: SignalEntry) => SignalClassifyResult,
-  options?: CrossReferenceAgentIpsOptions,
+  options?: IpCorrelationOptions,
 ): ClassifiedEntry[] {
   const windowSeconds = options?.windowSeconds ?? DEFAULT_AGENT_IP_WINDOW_SECONDS;
 

@@ -139,11 +139,14 @@ export interface AgentSeed {
   category?: string;
 }
 
-/** Options for crossReferenceAgentIps. */
-export interface CrossReferenceAgentIpsOptions {
-  /** Max seconds between a programmatic request and a self-identifying agent request from the same IP. Default 900. */
+/** Options for the IP cross-reference functions. */
+export interface IpCorrelationOptions {
+  /** Max seconds between a programmatic request and the agent activity it is attributed to. Default 900. */
   windowSeconds?: number;
 }
+
+/** @deprecated Use IpCorrelationOptions. */
+export type CrossReferenceAgentIpsOptions = IpCorrelationOptions;
 
 /** Options for detectSpoofedBrowsers. */
 export interface SpoofedBrowserOptions {

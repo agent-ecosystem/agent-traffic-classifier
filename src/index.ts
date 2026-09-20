@@ -26,6 +26,7 @@ export type {
   ProgrammaticStat,
   AgentStat,
   DaySummary,
+  IpCorrelationOptions,
   CrossReferenceAgentIpsOptions,
   SpoofedBrowserOptions,
   BrowserFamily,

@@ -5,6 +5,7 @@ import {
   buildAgentSeeds,
   reclassifyEntries,
   crossReferenceAgentIps,
+  crossReferenceSignalIps,
   detectSpoofedBrowsers,
   parseBrowserVersion,
 } from '../src/sessions.js';
@@ -233,6 +234,62 @@ describe('crossReferenceAgentIps', () => {
       { windowSeconds: 30 },
     );
     expect(out[0].classification.category).toBe('programmatic');
+  });
+});
+
+describe('crossReferenceSignalIps window', () => {
+  const unidentified = sig({ ip: '5.5.5.5', ua: 'SomeUnknownClient/1.0', trigger: 'llms-txt' });
+  const named = sig({
+    ip: '5.5.5.5',
+    ua: CLAUDE_CODE,
+    trigger: 'content-negotiation',
+    accept: 'text/markdown, text/html, */*',
+    timestamp: 1_800_000_000 + 60,
+  });
+  it('upgrades programmatic requests within the default window and prefers named agents', () => {
+    const out = crossReferenceSignalIps(
+      classified([log({ ip: '5.5.5.5', userAgent: 'curl/8.7.1', timestamp: 1_800_000_000 + 30 })]),
+      [unidentified, named],
+      'example.com',
+      classifySignalEntry,
+    );
+    expect(out[0].classification).toEqual({
+      category: 'agent',
+      botName: 'Claude Code',
+      botCompany: 'Anthropic',
+    });
+  });
+  it('does not upgrade requests outside the window', () => {
+    const out = crossReferenceSignalIps(
+      classified([
+        log({ ip: '5.5.5.5', userAgent: 'curl/8.7.1', timestamp: 1_800_000_000 + 4 * 3600 }),
+      ]),
+      [unidentified, named],
+      'example.com',
+      classifySignalEntry,
+    );
+    expect(out[0].classification.category).toBe('programmatic');
+  });
+  it('restores the unbounded behaviour with windowSeconds: Infinity', () => {
+    const out = crossReferenceSignalIps(
+      classified([
+        log({ ip: '5.5.5.5', userAgent: 'curl/8.7.1', timestamp: 1_800_000_000 + 4 * 3600 }),
+      ]),
+      [unidentified, named],
+      'example.com',
+      classifySignalEntry,
+      { windowSeconds: Infinity },
+    );
+    expect(out[0].classification.category).toBe('agent');
+  });
+  it('never touches human browser traffic', () => {
+    const out = crossReferenceSignalIps(
+      classified([log({ ip: '5.5.5.5', userAgent: CHROME_NEW, timestamp: 1_800_000_000 + 30 })]),
+      [named],
+      'example.com',
+      classifySignalEntry,
+    );
+    expect(out[0].classification.category).toBe('human');
   });
 });
 
