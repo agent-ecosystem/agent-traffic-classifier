@@ -37,6 +37,12 @@ export interface SignalClassifyResult {
   isAgent: boolean;
   name?: string;
   company?: string | null;
+  /**
+   * Category to apply to matching access-log traffic when the entry is not an
+   * agent but still identifies the client (e.g. `spoofed-browser`). Agents
+   * always map to the `agent` category; leave unset for plain non-agent results.
+   */
+  category?: string;
 }
 
 /** IP intelligence result for a single IP address. */
@@ -129,7 +135,36 @@ export interface AgentSeed {
   company: string | null;
   earliestTs: number;
   latestTs: number;
+  /** Category applied to matching entries. Defaults to `agent`. */
+  category?: string;
 }
+
+/** Options for crossReferenceAgentIps. */
+export interface CrossReferenceAgentIpsOptions {
+  /** Max seconds between a programmatic request and a self-identifying agent request from the same IP. Default 900. */
+  windowSeconds?: number;
+}
+
+/** Options for detectSpoofedBrowsers. */
+export interface SpoofedBrowserOptions {
+  /** Minimum requests an IP+UA pair must have before it can be demoted. Default 2. Single hits always stay human. */
+  minRequests?: number;
+  /**
+   * How many major versions behind the newest asset-loading session of the same
+   * browser family a UA must be to count as stale. Defaults: chrome 15, edge 15,
+   * firefox 15, safari 3, ios 3.
+   */
+  staleMajors?: Partial<Record<BrowserFamily, number>>;
+  /**
+   * Reference (newest plausible) major version per family. When omitted, computed
+   * from the entries themselves: the newest major seen among pairs that loaded
+   * static assets. Families with no reference are never demoted.
+   */
+  referenceMajors?: Partial<Record<BrowserFamily, number>>;
+}
+
+/** Browser families recognised by the spoofed-browser version test. */
+export type BrowserFamily = 'chrome' | 'edge' | 'firefox' | 'safari' | 'ios';
 
 /** Per-agent summary within a signal summary. */
 export interface SignalAgentSummary {

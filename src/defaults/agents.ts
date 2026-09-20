@@ -1,5 +1,6 @@
 import type { IpInfo, SignalEntry, SignalHeuristic } from '../types.js';
 import { CURSOR_PROXY_AGENT } from './sessions.js';
+import { CATEGORY_SPOOFED_BROWSER } from './categories.js';
 
 /** Known agent UA patterns for signal classification. */
 export const DEFAULT_KNOWN_AGENTS: Array<{ pattern: string; name: string; company: string }> = [
@@ -159,6 +160,56 @@ export const tracedProxyHeuristic: SignalHeuristic = (entry: SignalEntry) => {
 /** @deprecated Renamed to tracedProxyHeuristic; kept as an alias. */
 export const cursorHeuristic: SignalHeuristic = tracedProxyHeuristic;
 
+/** Name reported for clients whose browser headers contradict their user agent. */
+export const SPOOFED_BROWSER_NAME = 'browser-spoofing crawler';
+
+/**
+ * Spoofed browser heuristic: the request carries browser client hints that a
+ * real browser could not have produced alongside its own user agent.
+ *
+ * - Firefox and Safari never send `Sec-Ch-Ua`; a Gecko or WebKit UA with client
+ *   hints is a fetch library wearing a costume.
+ * - Chrome and Edge report their own major version in `Sec-Ch-Ua`; a UA whose
+ *   major disagrees with the hint is spoofed.
+ *
+ * Observed in September 2026 as a distributed crawler (~1,000 IPs, a frozen set
+ * of early-2024 browser UAs, client hints from a small fixed pool) that fetched
+ * llms.txt and .md URLs while presenting as human visitors.
+ *
+ * Returns a non-agent result carrying the `spoofed-browser` category, so
+ * session attribution can relabel the matching IP+UA traffic without
+ * counting it as an agent.
+ */
+export const spoofedBrowserHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+  const h = entry.headers ?? {};
+  const ua = h['User-Agent'] || '';
+  const hints = h['Sec-Ch-Ua'];
+  if (!hints || !ua.startsWith('Mozilla/5.0 (')) return null;
+
+  const isGecko = /Gecko\/\d+/.test(ua) && /Firefox\//.test(ua);
+  const isSafari = /Version\/[\d.]+.*Safari\//.test(ua) && !/Chrome\/|Chromium\/|CriOS\//.test(ua);
+  if (isGecko || isSafari) {
+    return {
+      isAgent: false,
+      category: CATEGORY_SPOOFED_BROWSER,
+      name: SPOOFED_BROWSER_NAME,
+      company: null,
+    };
+  }
+
+  const uaMajor = (ua.match(/(?:Chrome|CriOS|Edg)\/(\d+)/) ?? [])[1];
+  const hintMajor = (hints.match(/"(?:Google Chrome|Chromium|Microsoft Edge)";v="(\d+)"/) ?? [])[1];
+  if (uaMajor && hintMajor && uaMajor !== hintMajor) {
+    return {
+      isAgent: false,
+      category: CATEGORY_SPOOFED_BROWSER,
+      name: SPOOFED_BROWSER_NAME,
+      company: null,
+    };
+  }
+  return null;
+};
+
 /**
  * Chrome 122 / macOS 14.7.2 heuristic: frozen Chrome version and OS fingerprint
  * combined with markdown content negotiation. Identified in HN traffic analysis
@@ -287,6 +338,7 @@ export const plainTextFetcherHeuristic: SignalHeuristic = (entry: SignalEntry) =
 
 /** Default heuristics for signal-based agent detection (order matters: first match wins). */
 export const DEFAULT_HEURISTICS: SignalHeuristic[] = [
+  spoofedBrowserHeuristic,
   chrome122Heuristic,
   sentryBaggageHeuristic,
   cursorFetchHeuristic,

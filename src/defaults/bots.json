@@ -8,7 +8,8 @@
     "seo-bot": "SEO/marketing analysis bots",
     "monitoring": "Uptime and performance monitors",
     "social-preview": "Social media link preview fetchers",
-    "feed-reader": "Feed readers and news apps (user-initiated)"
+    "feed-reader": "Feed readers and news apps (user-initiated)",
+    "spoofed-browser": "Automation wearing browser user agents (never assigned by UA match; see detectSpoofedBrowsers)"
   },
   "bots": [
     {
@@ -842,7 +843,7 @@
     {
       "pattern": "coccocbot",
       "name": "CocCocBot",
-      "company": "Cốc Cốc",
+      "company": "C\u1ed1c C\u1ed1c",
       "category": "search-crawler"
     },
     {
@@ -927,6 +928,12 @@
       "pattern": "BacklinkDiscovery",
       "name": "BacklinkDiscovery",
       "company": null,
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "PipericBot",
+      "name": "PipericBot",
+      "company": "Piperic",
       "category": "seo-bot"
     },
     {
