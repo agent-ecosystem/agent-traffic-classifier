@@ -4,6 +4,7 @@ export const DEFAULT_TOP_PATHS_SKIP_CATEGORIES = [
   'other-bot',
   'monitoring',
   'spoofed-browser',
+  'scanner',
 ];
 
 /** Default max number of top paths shown per AI bot or agent in their breakdown. */

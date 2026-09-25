@@ -9,7 +9,8 @@
     "monitoring": "Uptime and performance monitors",
     "social-preview": "Social media link preview fetchers",
     "feed-reader": "Feed readers and news apps (user-initiated)",
-    "spoofed-browser": "Automation wearing browser user agents (never assigned by UA match; see detectSpoofedBrowsers)"
+    "spoofed-browser": "Automation wearing browser user agents (never assigned by UA match; see detectSpoofedBrowsers)",
+    "scanner": "Vulnerability scanners and exploit probes (also assigned by detectScanners from behaviour)"
   },
   "bots": [
     {
@@ -1133,6 +1134,150 @@
       "name": "Feed Aggregator",
       "company": null,
       "category": "feed-reader"
+    },
+    {
+      "pattern": "zgrab",
+      "name": "zgrab",
+      "company": "ZMap Project",
+      "category": "scanner"
+    },
+    {
+      "pattern": "masscan",
+      "name": "masscan",
+      "company": "Robert Graham",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Nuclei",
+      "name": "Nuclei",
+      "company": "ProjectDiscovery",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Nikto",
+      "name": "Nikto",
+      "company": "CIRT.net",
+      "category": "scanner"
+    },
+    {
+      "pattern": "sqlmap",
+      "name": "sqlmap",
+      "company": "sqlmap",
+      "category": "scanner"
+    },
+    {
+      "pattern": "WPScan",
+      "name": "WPScan",
+      "company": "WPScan",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Nmap Scripting Engine",
+      "name": "Nmap",
+      "company": "Nmap Project",
+      "category": "scanner"
+    },
+    {
+      "pattern": "CensysInspect",
+      "name": "CensysInspect",
+      "company": "Censys",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Expanse, a Palo Alto Networks company",
+      "name": "Expanse",
+      "company": "Palo Alto Networks",
+      "category": "scanner"
+    },
+    {
+      "pattern": "l9explore",
+      "name": "LeakIX",
+      "company": "LeakIX",
+      "category": "scanner"
+    },
+    {
+      "pattern": "l9tcpid",
+      "name": "LeakIX",
+      "company": "LeakIX",
+      "category": "scanner"
+    },
+    {
+      "pattern": "leakix.net",
+      "name": "LeakIX",
+      "company": "LeakIX",
+      "category": "scanner"
+    },
+    {
+      "pattern": "gobuster",
+      "name": "gobuster",
+      "company": "OJ Reeves",
+      "category": "scanner"
+    },
+    {
+      "pattern": "dirbuster",
+      "name": "DirBuster",
+      "company": "OWASP",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Fuzz Faster U Fool",
+      "name": "ffuf",
+      "company": "ffuf",
+      "category": "scanner"
+    },
+    {
+      "pattern": "feroxbuster",
+      "name": "feroxbuster",
+      "company": "epi052",
+      "category": "scanner"
+    },
+    {
+      "pattern": "crusader-worker",
+      "name": "crusader-worker",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "sppb-rce-poc",
+      "name": "SP Page Builder RCE probe",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "NetSystemsResearch",
+      "name": "NetSystemsResearch",
+      "company": "Net Systems Research",
+      "category": "scanner"
+    },
+    {
+      "pattern": "InternetMeasurement",
+      "name": "InternetMeasurement",
+      "company": "driftnet.io",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Odin; https://docs.getodin.com",
+      "name": "Odin",
+      "company": "Odin",
+      "category": "scanner"
+    },
+    {
+      "pattern": "GenomeCrawlerd",
+      "name": "GenomeCrawlerd",
+      "company": "Genome",
+      "category": "scanner"
+    },
+    {
+      "pattern": "CMS-Security-Auditor",
+      "name": "CMS-Security-Auditor",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "cve-",
+      "name": "CVE probe",
+      "company": "unknown",
+      "category": "scanner"
     }
   ]
 }

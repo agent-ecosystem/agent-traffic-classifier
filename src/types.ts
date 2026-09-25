@@ -85,6 +85,8 @@ export interface FilterOptions {
   skipPrefixes?: string[];
   skipSubstrings?: string[];
   siteSkipPaths?: string[];
+  /** Regex patterns matched against the raw path. Defaults to `DEFAULT_PROBE_PATTERNS` (vulnerability scanner probes). */
+  skipPatterns?: RegExp[];
 }
 
 /** Options for createSignalClassifier. */
@@ -164,6 +166,20 @@ export interface SpoofedBrowserOptions {
    * static assets. Families with no reference are never demoted.
    */
   referenceMajors?: Partial<Record<BrowserFamily, number>>;
+}
+
+/** Options for detectScanners. */
+export interface ScannerOptions {
+  /** Minimum probe requests, within `windowSeconds` of each other, before an IP is treated as a scanner. Default 3. */
+  minProbes?: number;
+  /** Max seconds between a request and the nearest probe from the same IP for it to be demoted. Default 900. */
+  windowSeconds?: number;
+  /** Patterns that identify probe paths. Defaults to `DEFAULT_PROBE_PATTERNS`. */
+  probePatterns?: RegExp[];
+  /** Full override of the per-request probe test. Defaults to `isProbeRequest` with `probePatterns`. */
+  isProbe?: (entry: LogEntry) => boolean;
+  /** Categories eligible for demotion. Defaults to `DEFAULT_SCANNER_CATEGORIES`. */
+  categories?: string[];
 }
 
 /** Browser families recognised by the spoofed-browser version test. */

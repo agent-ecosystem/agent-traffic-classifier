@@ -5,6 +5,7 @@ import {
   DEFAULT_SKIP_PREFIXES,
   DEFAULT_SKIP_SUBSTRINGS,
 } from './defaults/skip.js';
+import { DEFAULT_PROBE_PATTERNS } from './defaults/scanner.js';
 
 /**
  * Create a filter function that determines whether a log entry should be skipped.
@@ -16,6 +17,7 @@ export function createFilter(options?: FilterOptions): (entry: LogEntry) => bool
   const skipPrefixes = options?.skipPrefixes ?? DEFAULT_SKIP_PREFIXES;
   const skipSubstrings = options?.skipSubstrings ?? DEFAULT_SKIP_SUBSTRINGS;
   const siteSkipPaths = options?.siteSkipPaths ?? [];
+  const skipPatterns = options?.skipPatterns ?? DEFAULT_PROBE_PATTERNS;
 
   return (entry: LogEntry): boolean => {
     const { path } = entry;
@@ -23,6 +25,7 @@ export function createFilter(options?: FilterOptions): (entry: LogEntry) => bool
     if (skipPaths.some((p) => path.startsWith(p))) return true;
     if (skipPrefixes.some((p) => path.startsWith(p))) return true;
     if (skipSubstrings.some((s) => path.includes(s))) return true;
+    if (skipPatterns.some((re) => re.test(path))) return true;
     // Per-site skip paths
     if (siteSkipPaths.some((p) => path.startsWith(p))) return true;
     return false;

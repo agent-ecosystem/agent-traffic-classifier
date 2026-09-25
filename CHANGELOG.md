@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/) with 0.x semantics: minor versions may change classification behavior.
 
+## [Unreleased]
+
+Based on a scanner session captured on 2026-09-18: one datacenter IP made 839 requests in 95 minutes, rotating through fifteen browser user agents and attaching a fake referrer (Reddit, Facebook, Google, Hacker News, Twitter, or a random search-engine or t.co URL) to each one. The probes themselves were dropped by the filter, but the rest of the session classified as `human` and put Reddit and Hacker News at the top of the site's referral sources. A review across five sites and eight days then found `.env` sweeps from Google Cloud addresses, an AI-agent credential harvester, a Next.js server-action RCE probe, a Joomla RCE probe with a self-identifying user agent, and CMS fingerprinters, plus one legitimate benchmark crawler that a first draft of the detector would have mislabelled.
+
+### Added
+
+- `detectScanners`: demotes every request an IP made within a window (default 15 minutes) of its vulnerability probes to the new `scanner` category, once it has sent a burst of at least `minProbes` (default 3) within that window. Takes the fake referrers out of `topReferrers` and the existence checks out of `topPaths`. IP+UA pairs that navigated with a same-site referrer, self-identifying bots (curated or isbot-detected), and attributed agents are never touched.
+- `isProbeRequest`: the per-request probe test. A probe pattern in the path counts only on a 4xx answer, so a path the site really serves (`/wp-login.php` on WordPress, a downloadable `docker-compose.yml`) never counts. A probe pattern in the query string counts at any status. PROPFIND, TRACE, TRACK, and CONNECT count on any 4xx; POST, PUT, PATCH, and DELETE count on 404, 405, or 501. `ScannerOptions.isProbe` overrides it entirely.
+- `DEFAULT_PROBE_PATTERNS` and `isProbePath`: path traversal in any encoding (`/../`, `/%2e%2e/`, `/%252e%252e/`, `/%2f../`, `/%2e./`, overlong UTF-8), absolute system paths, private keys, cloud credential files, AI coding agent credential stores (`.claude/`, `.codex/`, `.cursor/`, `.config/gcloud/`), config dumps (`serverless.yml`, `docker-compose.yaml`, `application.properties`, `appsettings.json`, `composer.json`, `package.json`), framework debug endpoints, PHP info and web-shell filenames, CMS fingerprints (`wlwmanifest.xml`, `joomla.xml`, plugin `readme.txt`), Next.js RSC endpoints, injection payloads (`${jndi:`, `union select`, `<script`, `XDEBUG_SESSION_START`), and backup archives. Patterns are anchored to filenames where a substring could match a blog slug (`phpinfo`, `xmlrpc`).
+- `createFilter` gained `skipPatterns` (default `DEFAULT_PROBE_PATTERNS`), so the probes above are dropped from stats like the substring probes already were. Pass `skipPatterns: []` to count them instead.
+- `isSameSiteReferrer(referrer, domain)`: host comparison with `www.` ignored. Used by `buildSessionProfiles`, `detectSpoofedBrowsers`, and `detectScanners`.
+- Bot database: a `scanner` category with self-identifying scanners (zgrab, masscan, Nuclei, Nikto, sqlmap, WPScan, Nmap, CensysInspect, Expanse, LeakIX, gobuster, DirBuster, ffuf, feroxbuster, NetSystemsResearch, InternetMeasurement, Odin, GenomeCrawlerd) and observed one-offs (`crusader-worker`, `sppb-rce-poc`, `CMS-Security-Auditor`, `cve-` prefixed).
+- `CATEGORY_SCANNER`, `SCANNER_NAME`, `DEFAULT_SCANNER_MIN_PROBES`, `DEFAULT_SCANNER_WINDOW_SECONDS`, `DEFAULT_SCANNER_CATEGORIES`, `PROBE_METHODS_ANY_4XX`, `PROBE_METHODS_MISSING`, `ScannerOptions`.
+- `scanner` is in `DEFAULT_TOP_PATHS_SKIP_CATEGORIES`.
+
+### Changed
+
+- **Same-site referrers are now matched by host, not substring.** `buildSessionProfiles` and `detectSpoofedBrowsers` previously treated any referrer containing the domain as navigation within the site, so a spoofed `https://www.google.com/search?q=example.com` referrer (observed in the wild; Google has not sent query terms since 2011) counted as a real browser session.
+- **A bare `Mozilla/5.0` (or `Mozilla/4.0`, with or without `(compatible)`) user agent is now `unknown`, not `other-bot`.** It carries no identity, and isbot's bot verdict was exempting a 256-request `.env` sweep from behavioural detection.
+- The default filter now also skips requests matching `DEFAULT_PROBE_PATTERNS`, so daily totals drop slightly on sites that get scanned. Path traversal and system-path probes previously counted as content requests.
+
 ## [0.4.0] - 2026-09-20
 
 ### Added

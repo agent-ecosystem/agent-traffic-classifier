@@ -29,6 +29,7 @@ export type {
   IpCorrelationOptions,
   CrossReferenceAgentIpsOptions,
   SpoofedBrowserOptions,
+  ScannerOptions,
   BrowserFamily,
 } from './types.js';
 
@@ -79,6 +80,8 @@ export {
   crossReferenceSignalIps,
   crossReferenceAgentIps,
   detectSpoofedBrowsers,
+  detectScanners,
+  isSameSiteReferrer,
   parseBrowserVersion,
   DEFAULT_AGENT_IP_WINDOW_SECONDS,
   DEFAULT_STALE_MAJORS,
@@ -121,6 +124,17 @@ export {
   DEFAULT_SKIP_SUBSTRINGS,
 } from './defaults/skip.js';
 export {
+  DEFAULT_PROBE_PATTERNS,
+  DEFAULT_SCANNER_MIN_PROBES,
+  DEFAULT_SCANNER_WINDOW_SECONDS,
+  DEFAULT_SCANNER_CATEGORIES,
+  SCANNER_NAME,
+  PROBE_METHODS_ANY_4XX,
+  PROBE_METHODS_MISSING,
+  isProbePath,
+  isProbeRequest,
+} from './defaults/scanner.js';
+export {
   DEFAULT_WINDOW_SECONDS,
   DEFAULT_PROXY_WINDOW_SECONDS,
   CURSOR_PROXY_AGENT,
@@ -136,6 +150,7 @@ export {
   CATEGORY_OTHER_BOT,
   CATEGORY_AGENT,
   CATEGORY_SPOOFED_BROWSER,
+  CATEGORY_SCANNER,
   CATEGORY_FEED_READER,
   AI_CATEGORY_PREFIX,
   UNIDENTIFIED_AGENT,

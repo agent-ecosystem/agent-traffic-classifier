@@ -21,7 +21,8 @@ Given access log entries (and optionally HTTP header signals), the library:
 5. **Clusters sessions** by correlating signal data with access logs to reclassify traffic that would otherwise look human
 6. **Cross-references programmatic traffic** with signal data to upgrade HTTP client requests (httpx, undici, etc.) to agent when they share IPs with known agent signals
 7. **Detects proxy-based agents** (like Cursor) via a duplicate-request heuristic: same path + UA from different IPs within a short window
-8. **Aggregates** classified entries into daily summary documents with category breakdowns, top paths, referrers, bot/agent/programmatic stats, and status codes
+8. **Detects vulnerability scanners** by the paths they probe for (`.env`, `.git`, SSH keys, path traversal) and relabels the whole session, so scanners that rotate browser user agents and attach fake Reddit or Hacker News referrers stay out of human stats and referral sources
+9. **Aggregates** classified entries into daily summary documents with category breakdowns, top paths, referrers, bot/agent/programmatic stats, and status codes
 
 ## Install
 
@@ -178,22 +179,23 @@ const entry: LogEntry = {
 
 Every request is classified into one of these categories:
 
-| Category          | Description                                                                                                                                                                                                 |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `human`           | Regular browser traffic                                                                                                                                                                                     |
-| `agent`           | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, Qoder, ZCode, grok-agent, MCP clients) and AI desktop apps' embedded browsers (Claude Desktop, WorkBuddy, CodeBuddy) |
-| `ai-crawler`      | AI training data crawlers (GPTBot, ClaudeBot, SSI-Nutch, DeepSeekBot, etc.)                                                                                                                                 |
-| `ai-assistant`    | AI assistants fetching live content on a user's behalf (ChatGPT-User, Claude-User, Perplexity-User, MistralAI-User, DuckAssistBot, Amazon Quick)                                                            |
-| `ai-search`       | AI-powered search engines (PerplexityBot, OAI-SearchBot, Claude-SearchBot, ExaSearchBot, Kagibot)                                                                                                           |
-| `search-crawler`  | Traditional search engines (Googlebot, Bingbot)                                                                                                                                                             |
-| `seo-bot`         | SEO/marketing bots (AhrefsBot, SemrushBot)                                                                                                                                                                  |
-| `monitoring`      | Uptime monitors (UptimeRobot, Pingdom)                                                                                                                                                                      |
-| `social-preview`  | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                                                                                                                            |
-| `feed-reader`     | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                                                                                                                               |
-| `programmatic`    | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                                                                                                                             |
-| `spoofed-browser` | Automation wearing a browser user agent that does not behave like one. Never assigned by user agent alone; see `detectSpoofedBrowsers` and the spoofed-header heuristic                                     |
-| `other-bot`       | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list                                                                                                                   |
-| `unknown`         | Empty or missing user-agent                                                                                                                                                                                 |
+| Category          | Description                                                                                                                                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `human`           | Regular browser traffic                                                                                                                                                                                                             |
+| `agent`           | AI coding agents (Claude Code, Claude Agent, Cursor, Kiro, GitHub Copilot, Gemini CLI, Qoder, ZCode, grok-agent, MCP clients) and AI desktop apps' embedded browsers (Claude Desktop, WorkBuddy, CodeBuddy)                         |
+| `ai-crawler`      | AI training data crawlers (GPTBot, ClaudeBot, SSI-Nutch, DeepSeekBot, etc.)                                                                                                                                                         |
+| `ai-assistant`    | AI assistants fetching live content on a user's behalf (ChatGPT-User, Claude-User, Perplexity-User, MistralAI-User, DuckAssistBot, Amazon Quick)                                                                                    |
+| `ai-search`       | AI-powered search engines (PerplexityBot, OAI-SearchBot, Claude-SearchBot, ExaSearchBot, Kagibot)                                                                                                                                   |
+| `search-crawler`  | Traditional search engines (Googlebot, Bingbot)                                                                                                                                                                                     |
+| `seo-bot`         | SEO/marketing bots (AhrefsBot, SemrushBot)                                                                                                                                                                                          |
+| `monitoring`      | Uptime monitors (UptimeRobot, Pingdom)                                                                                                                                                                                              |
+| `social-preview`  | Link preview fetchers (Twitterbot, Slackbot, Mastodon, WhatsApp)                                                                                                                                                                    |
+| `feed-reader`     | Feed readers and news apps (FreshRSS, Feedly, HackerNews app)                                                                                                                                                                       |
+| `programmatic`    | HTTP clients (curl, axios, python-requests, httpx, trafilatura)                                                                                                                                                                     |
+| `spoofed-browser` | Automation wearing a browser user agent that does not behave like one. Never assigned by user agent alone; see `detectSpoofedBrowsers` and the spoofed-header heuristic                                                             |
+| `scanner`         | Vulnerability scanners: self-identifying ones by user agent (zgrab, Nuclei, CensysInspect, sqlmap) and, via `detectScanners`, any IP that sent a burst of probes for secrets or exploits (`.env`, `.git`, SSH keys, path traversal) |
+| `other-bot`       | Bots detected by [isbot](https://github.com/nicedayfor/isbot) but not in the curated list                                                                                                                                           |
+| `unknown`         | Empty or missing user-agent                                                                                                                                                                                                         |
 
 Classification priority: curated bot list > programmatic client heuristic > isbot fallback > human.
 
@@ -295,6 +297,8 @@ const shouldSkip = createFilter({
 
 The default substrings cover common vulnerability scanner probes (`wp-admin`, `phpinfo`, `.git/`, `.ssh/`, `.aws/`, `xmlrpc`, `_profiler`, etc.) using substring matching, so they catch all prefix variants at once (e.g., `/wp/wp-admin/`, `/blog/wp-admin/`, `/old/wp-admin/`).
 
+`skipPatterns` (default `DEFAULT_PROBE_PATTERNS`) adds regex matching for probes a substring cannot express: path traversal in any encoding (`/../`, `/%2e%2e/`, `/%252e%252e/`, `/%2f../`), absolute system paths (`/etc/`, `/proc/`, `/var/log/`), private keys (`id_rsa`, `id_ed25519`), credential files (`aws-credentials`, `serviceaccount/token`), config dumps (`serverless.yml`, `docker-compose.yaml`, `application.properties`, `appsettings.json`), and framework debug endpoints (`actuator`, `_ignition`, `telescope/api`). The same patterns drive `detectScanners`, together with status code and method (see `isProbeRequest`). Pass `skipPatterns: []` to count probe requests in stats (they then show up under the `scanner` category if `detectScanners` runs).
+
 ### Signal classifier
 
 ```ts
@@ -361,6 +365,29 @@ const result = detectDuplicateRequestAgents(classified, {
 });
 ```
 
+### Scanner detection
+
+```ts
+import { detectScanners, isProbeRequest, DEFAULT_PROBE_PATTERNS } from 'agent-traffic-classifier';
+
+// Run on the full (unfiltered) entries so the probes are visible.
+const result = detectScanners(classified, 'example.com', {
+  minProbes: 3, // Probes within one window before an IP counts as a scanner (default: 3)
+  windowSeconds: 900, // Burst window, and how far from a probe a request is demoted (default: 900)
+  probePatterns: [...DEFAULT_PROBE_PATTERNS, /\/my-honeypot\//], // Extend the probe list
+  categories: ['human', 'programmatic'], // Categories eligible for demotion
+  isProbe: (entry) => isProbeRequest(entry) || entry.path === '/trap', // Full override of the probe test
+});
+```
+
+Scanners rotate through browser user agents and attach a fake referrer (Reddit, Hacker News, Facebook, Google, t.co) to every request, so request by request they classify as `human` and their referrers surface as referral sources. The filter drops the probes themselves, but the rest of the session (existence checks like `/admin.css`, config-file guesses like `/telescope`) leaks through. `detectScanners` relabels everything the IP did within the window of its probes to `scanner`, which `aggregate` excludes from top paths and referrers.
+
+A request is a probe (`isProbeRequest`) when a probe pattern matches the path and the server answered 4xx, when a probe pattern matches the query string at any status (static hosts answer `/?rest_route=/wp/v2/users` with the homepage), when the method is PROPFIND, TRACE, TRACK, or CONNECT and the answer is 4xx, or when a POST, PUT, PATCH, or DELETE hits a missing target (404, 405, 501). The status guard makes the detector self-calibrating: `/wp-login.php` counts on a static site and not on WordPress, and a `docker-compose.yml` a docs site serves for download never counts.
+
+Shared-IP safety: an IP+UA pair that ever navigated with a same-site referrer is never touched (a scanner never navigates; a person behind the same NAT clicking through the site does), self-identifying bots (including isbot-detected `other-bot`) and attributed agents are never touched, the burst requirement keeps a crawler that checks `/wp-admin/` once per visit from qualifying, and the window keeps a probe burst from relabelling unrelated traffic from the same address hours later. Same-site referrers are compared by host, so a fake `https://www.google.com/search?q=example.com` referrer does not count as navigation.
+
+Self-identifying scanners (zgrab, masscan, Nuclei, Nikto, sqlmap, WPScan, CensysInspect, Expanse, LeakIX, gobuster, ffuf, and a few observed one-offs) are classified `scanner` directly from the bot database. A bare `Mozilla/5.0` user agent, which isbot flags as a bot, is classified `unknown` so behavioural detection still applies to it.
+
 ### Aggregation
 
 ```ts
@@ -409,7 +436,11 @@ Two constraints govern every function here that uses IP evidence: human-category
 - **`crossReferenceSignalIps(entries, signalEntries, domain, classifySignalEntry, options?)`** -- Upgrade programmatic entries to agent when their IP produced an agent signal on the same domain within a window (default 15 minutes; any agent signal counts, named agents preferred over "unidentified")
 - **`crossReferenceAgentIps(entries, signalEntries, classifySignalEntry, options?)`** -- Attribute programmatic requests (curl and friends) to a self-identifying agent active from the same IP within a short window (default 15 minutes), across user agents and domains. Only ever touches `programmatic` entries
 - **`detectSpoofedBrowsers(entries, domain, options?)`** -- Demote browser-UA traffic that never loads assets, never navigates with a same-site referrer, has two or more requests, and runs a browser version far behind the newest asset-loading session of the same family. Single-request pairs and current versions are never touched
+- **`detectScanners(entries, domain, options?)`** -- Demote every request an IP made within a window of its vulnerability probes to `scanner`, once it has sent a burst of at least three. IP+UA pairs with a same-site referrer, self-identifying bots, and attributed agents are never touched
+- **`isSameSiteReferrer(referrer, domain)`** -- Whether a referrer URL is hosted on the domain or a subdomain (host comparison, `www.` ignored)
 - **`parseBrowserVersion(userAgent)`** -- Browser family and major version for mainstream browser UAs, null otherwise
+- **`isProbePath(path, patterns?)`** -- Whether a request path matches a vulnerability probe pattern
+- **`isProbeRequest(entry, patterns?)`** -- Whether a request is a probe, taking status code and method into account
 
 ### IP intelligence
 
@@ -456,6 +487,14 @@ import {
   DEFAULT_SKIP_PATHS,
   DEFAULT_SKIP_PREFIXES,
   DEFAULT_SKIP_SUBSTRINGS,
+  // Scanner detection
+  DEFAULT_PROBE_PATTERNS,
+  DEFAULT_SCANNER_MIN_PROBES,
+  DEFAULT_SCANNER_WINDOW_SECONDS,
+  DEFAULT_SCANNER_CATEGORIES,
+  SCANNER_NAME,
+  PROBE_METHODS_ANY_4XX,
+  PROBE_METHODS_MISSING,
   // Session config
   DEFAULT_WINDOW_SECONDS,
   DEFAULT_PROXY_WINDOW_SECONDS,
@@ -469,6 +508,8 @@ import {
   CATEGORY_FEED_READER,
   CATEGORY_PROGRAMMATIC,
   CATEGORY_OTHER_BOT,
+  CATEGORY_SPOOFED_BROWSER,
+  CATEGORY_SCANNER,
   CATEGORY_UNKNOWN,
   AI_CATEGORY_PREFIX,
   UNIDENTIFIED_AGENT,

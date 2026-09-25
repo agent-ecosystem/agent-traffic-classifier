@@ -19,6 +19,9 @@ export const CATEGORY_AGENT = 'agent';
 /** Category for automation that wears a browser user agent but does not behave like a browser. */
 export const CATEGORY_SPOOFED_BROWSER = 'spoofed-browser';
 
+/** Category for traffic from an IP running a vulnerability scanner. Assigned by `detectScanners`, never by user agent. */
+export const CATEGORY_SCANNER = 'scanner';
+
 /** Prefix shared by all AI bot categories (ai-crawler, ai-assistant, ai-search). */
 export const AI_CATEGORY_PREFIX = 'ai-';
 

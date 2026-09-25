@@ -9,6 +9,13 @@ import {
   CATEGORY_HUMAN,
 } from './defaults/categories.js';
 
+/**
+ * A bare `Mozilla/5.0` (or `Mozilla/4.0`, with or without `(compatible)`) says
+ * nothing about the client. isbot flags it as a bot; here it is `unknown`, like
+ * an empty user agent, so it stays eligible for behavioural detection.
+ */
+const BARE_MOZILLA_RE = /^Mozilla\/[45]\.0(?:\s*\(compatible;?\s*\))?\s*$/;
+
 /** The default bot database shipped with the library. */
 export const defaultBotDb = defaultBotDatabase as {
   categories: Record<string, string>;
@@ -32,7 +39,7 @@ export function createClassifier(
   const exactProgrammatic = options?.exactProgrammaticClients ?? DEFAULT_EXACT_PROGRAMMATIC;
 
   return (userAgent: string): ClassifyResult => {
-    if (!userAgent || userAgent === '-') {
+    if (!userAgent || userAgent === '-' || BARE_MOZILLA_RE.test(userAgent)) {
       return { category: CATEGORY_UNKNOWN, botName: null, botCompany: null };
     }
 

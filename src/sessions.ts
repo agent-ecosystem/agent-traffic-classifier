@@ -5,6 +5,7 @@ import type {
   ClassifyResult,
   IpCorrelationOptions,
   LogEntry,
+  ScannerOptions,
   SessionOptions,
   SessionProfile,
   SignalClassifyResult,
@@ -20,10 +21,38 @@ import {
   CATEGORY_AGENT,
   CATEGORY_HUMAN,
   CATEGORY_PROGRAMMATIC,
+  CATEGORY_SCANNER,
   CATEGORY_SPOOFED_BROWSER,
   UNIDENTIFIED_AGENT,
 } from './defaults/categories.js';
 import { SPOOFED_BROWSER_NAME } from './defaults/agents.js';
+import {
+  DEFAULT_PROBE_PATTERNS,
+  DEFAULT_SCANNER_CATEGORIES,
+  DEFAULT_SCANNER_MIN_PROBES,
+  DEFAULT_SCANNER_WINDOW_SECONDS,
+  SCANNER_NAME,
+  isProbeRequest,
+} from './defaults/scanner.js';
+
+/**
+ * True when `referrer` is a URL on `domain` or one of its subdomains. Compares
+ * hosts, not substrings: a fake `https://www.google.com/search?q=example.com`
+ * must not count as navigation within example.com. A leading `www.` is ignored
+ * on both sides.
+ */
+export function isSameSiteReferrer(referrer: string | null | undefined, domain: string): boolean {
+  if (!referrer || referrer === '-') return false;
+  let host: string;
+  try {
+    host = new URL(referrer).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  const d = domain.toLowerCase().replace(/^www\./, '');
+  const h = host.replace(/^www\./, '');
+  return h === d || h.endsWith('.' + d);
+}
 
 /** Extensions that indicate static asset requests (images, scripts, styles, fonts). */
 const STATIC_ASSET_RE = /\.(css|js|mjs|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot)(\?|$)/i;
@@ -55,12 +84,7 @@ export function buildSessionProfiles(
       profile.hasStaticAssets = true;
     }
 
-    if (
-      !profile.hasSelfReferrer &&
-      entry.referrer &&
-      entry.referrer !== '-' &&
-      entry.referrer.includes(domain)
-    ) {
+    if (!profile.hasSelfReferrer && isSameSiteReferrer(entry.referrer, domain)) {
       profile.hasSelfReferrer = true;
     }
   }
@@ -529,8 +553,7 @@ export function detectSpoofedBrowsers(
     }
     p.n++;
     if (STATIC_ASSET_RE.test(entry.path)) p.assets = true;
-    if (entry.referrer && entry.referrer !== '-' && entry.referrer.includes(domain))
-      p.selfRef = true;
+    if (isSameSiteReferrer(entry.referrer, domain)) p.selfRef = true;
   }
 
   // Reference: newest major per family among pairs that behave like browsers.
@@ -560,6 +583,107 @@ export function detectSpoofedBrowsers(
       classification: {
         category: CATEGORY_SPOOFED_BROWSER,
         botName: SPOOFED_BROWSER_NAME,
+        botCompany: null,
+      },
+    };
+  });
+}
+
+/** True when `ts` is within `window` seconds of any value in the ascending list `sorted`. */
+function nearAny(sorted: number[], ts: number, window: number): boolean {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] < ts) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo < sorted.length && sorted[lo] - ts <= window) return true;
+  if (lo > 0 && ts - sorted[lo - 1] <= window) return true;
+  return false;
+}
+
+/** True when some `count` consecutive values of the ascending list span at most `window` seconds. */
+function hasBurst(sorted: number[], count: number, window: number): boolean {
+  if (count <= 1) return sorted.length >= count;
+  for (let i = count - 1; i < sorted.length; i++) {
+    if (sorted[i] - sorted[i - count + 1] <= window) return true;
+  }
+  return false;
+}
+
+/**
+ * Demote traffic from IPs running a vulnerability scanner to the `scanner`
+ * category.
+ *
+ * Scanners rotate through browser user agents and attach a fake referrer
+ * (Reddit, Hacker News, Facebook, Google, t.co) to every request so the
+ * traffic looks organic. Request by request it classifies as `human`. The
+ * probes themselves (.env, .git, SSH keys, path traversal) are dropped by the
+ * filter, but the rest of the session (existence checks, config-file guesses)
+ * leaks into human stats and the fake referrers surface as referral sources.
+ *
+ * An IP is a scanner once it has sent a burst of at least `minProbes` probe
+ * requests within `windowSeconds` of each other. A request is a probe when
+ * `isProbeRequest` says so: a probe path answered with 4xx, a probe pattern in
+ * the query string, or a method no browser sends (see `isProbeRequest`). Every
+ * request from that IP within `windowSeconds` of one of its probes is then
+ * relabelled, provided its category is one of `categories` (by default the
+ * ones a scanner hides in: human, spoofed-browser, programmatic, unknown).
+ *
+ * Shared-IP safety: IP+UA pairs that ever navigated with a same-site referrer
+ * are never touched (a scanner never navigates; a person behind the same NAT
+ * clicking through the site does). Self-identifying bots, including
+ * isbot-detected `other-bot`, and attributed agents are never touched. The
+ * burst requirement keeps a crawler that checks `/wp-admin/` once per visit
+ * from qualifying, and the window keeps a probe burst from relabelling
+ * unrelated traffic from the same address hours later.
+ *
+ * Run this on the full (unfiltered) entries, before the filter is applied, so
+ * the probes are visible to it.
+ */
+export function detectScanners(
+  classifiedEntries: ClassifiedEntry[],
+  domain: string,
+  options?: ScannerOptions,
+): ClassifiedEntry[] {
+  const minProbes = options?.minProbes ?? DEFAULT_SCANNER_MIN_PROBES;
+  const windowSeconds = options?.windowSeconds ?? DEFAULT_SCANNER_WINDOW_SECONDS;
+  const patterns = options?.probePatterns ?? DEFAULT_PROBE_PATTERNS;
+  const isProbe = options?.isProbe ?? ((entry: LogEntry) => isProbeRequest(entry, patterns));
+  const categories = new Set(options?.categories ?? DEFAULT_SCANNER_CATEGORIES);
+
+  const probeTs = new Map<string, number[]>();
+  const navigated = new Set<string>();
+  for (const { entry } of classifiedEntries) {
+    if (isSameSiteReferrer(entry.referrer, domain)) {
+      navigated.add(`${entry.ip}|||${entry.userAgent}`);
+    }
+    if (isProbe(entry)) {
+      if (!probeTs.has(entry.ip)) probeTs.set(entry.ip, []);
+      probeTs.get(entry.ip)!.push(entry.timestamp);
+    }
+  }
+
+  const scanners = new Map<string, number[]>();
+  for (const [ip, list] of probeTs) {
+    list.sort((a, b) => a - b);
+    if (hasBurst(list, minProbes, windowSeconds)) scanners.set(ip, list);
+  }
+  if (scanners.size === 0) return classifiedEntries;
+
+  return classifiedEntries.map((item) => {
+    if (!categories.has(item.classification.category)) return item;
+    const probes = scanners.get(item.entry.ip);
+    if (!probes) return item;
+    if (navigated.has(`${item.entry.ip}|||${item.entry.userAgent}`)) return item;
+    if (!nearAny(probes, item.entry.timestamp, windowSeconds)) return item;
+    return {
+      entry: item.entry,
+      classification: {
+        ...item.classification,
+        category: CATEGORY_SCANNER,
+        botName: SCANNER_NAME,
         botCompany: null,
       },
     };
