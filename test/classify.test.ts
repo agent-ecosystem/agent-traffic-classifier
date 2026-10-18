@@ -367,6 +367,14 @@ describe('createClassifier', () => {
       ).toBe('ai-crawler');
     });
 
+    it('classifies the Gort robots.txt survey (token inside a 2014 Safari UA) as seo-bot', () => {
+      const result = classify(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/600.2.5 (KHTML, like Gecko) Version/8.0.2 Safari/600.2.5 (Gort)',
+      );
+      expect(result.category).toBe('seo-bot');
+      expect(result.botName).toBe('Gort');
+    });
+
     it('classifies lead-generation and marketing crawlers as seo-bot', () => {
       expect(
         classify('SunriseTranscriptionReach/1.0 (+https://sunrisetranscription.com)').category,

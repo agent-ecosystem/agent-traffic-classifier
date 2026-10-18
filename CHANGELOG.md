@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/) with 0.x semantics: minor versions may change classification behavior.
 
+## [0.6.2] - 2026-10-18
+
+Based on the robots.txt requesters in the October 11 to 18 logs: 419 requests for `/robots.txt` arrived from browser user agents that the session passes still left as `human`. They came from 374 IP+UA pairs; 330 of those fetched `robots.txt` and nothing else, and 355 never loaded a static asset. The 19 pairs that did load assets were real sessions in which someone also opened `robots.txt`. The asset-less ones included two datacenter crawlers on current Chrome builds that faked a same-site referrer on every request (187 page views that the stale-version test could not touch) and three distributed robots.txt surveys rotating one frozen browser UA across 37 to 76 IPs each.
+
+### Added
+
+- `detectSpoofedBrowsers` gained a second trigger: a browser-UA pair that requested `/robots.txt` and never loaded a static asset is demoted to `spoofed-browser` regardless of browser version, referrers, or request count. No browser fetches the crawl-policy file on its own, and a person who types the URL in also renders pages. `SpoofedBrowserOptions.robotsFetchers` (default true) turns it off. Exported `ROBOTS_TXT_RE`.
+- Bot database: `(Gort)`, a robots.txt survey that hides its token at the end of a 2014 Safari user agent (76 IPs in the audit week, one `robots.txt` request each), as `seo-bot`.
+
 ## [0.6.1] - 2026-10-18
 
 ### Added

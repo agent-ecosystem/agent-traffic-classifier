@@ -1394,6 +1394,12 @@
       "category": "search-crawler"
     },
     {
+      "pattern": "(Gort)",
+      "name": "Gort",
+      "company": "unknown",
+      "category": "seo-bot"
+    },
+    {
       "pattern": "SunriseTranscriptionReach",
       "name": "SunriseTranscriptionReach",
       "company": "Sunrise Transcription",

@@ -92,6 +92,7 @@ export { extractDateKey } from './date.js';
 
 // Aggregation
 export { aggregate, normalizePath } from './aggregate.js';
+export { ROBOTS_TXT_RE } from './sessions.js';
 
 // Defaults (for consumer-side extension)
 export { DEFAULT_PROGRAMMATIC, DEFAULT_EXACT_PROGRAMMATIC } from './defaults/programmatic.js';

@@ -349,6 +349,53 @@ describe('detectSpoofedBrowsers', () => {
     );
     expect(out[2].classification.category).toBe('human');
   });
+  it('demotes a current-version pair that fetched robots.txt without loading assets, even with self-referrers', () => {
+    // October 2026: Hetzner crawlers on current Chrome faking same-site referrers on every request.
+    const crawler = [
+      log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/robots.txt' }),
+      log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/', referrer: 'https://example.com/' }),
+      log({
+        ip: '9.9.9.9',
+        userAgent: CHROME_NEW,
+        path: '/about/',
+        referrer: 'https://example.com/',
+        timestamp: 1_800_000_005,
+      }),
+    ];
+    const out = detectSpoofedBrowsers(classified([...realChrome, ...crawler]), 'example.com');
+    expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+    expect(out.slice(0, 2).every((e) => e.classification.category === 'human')).toBe(true);
+  });
+  it('demotes a single robots.txt-only request (distributed robots.txt surveys)', () => {
+    const out = detectSpoofedBrowsers(
+      classified([
+        ...realChrome,
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/robots.txt' }),
+      ]),
+      'example.com',
+    );
+    expect(out[2].classification.category).toBe('spoofed-browser');
+  });
+  it('keeps a robots.txt fetcher that also loaded assets (a person reading robots.txt)', () => {
+    const person = [
+      log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/' }),
+      log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/css/site.css' }),
+      log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/robots.txt?x=1' }),
+    ];
+    const out = detectSpoofedBrowsers(classified([...realChrome, ...person]), 'example.com');
+    expect(out.every((e) => e.classification.category === 'human')).toBe(true);
+  });
+  it('can turn the robots.txt trigger off', () => {
+    const out = detectSpoofedBrowsers(
+      classified([
+        ...realChrome,
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/robots.txt' }),
+      ]),
+      'example.com',
+      { robotsFetchers: false },
+    );
+    expect(out[2].classification.category).toBe('human');
+  });
   it('never demotes current versions, even with no assets (carrier-grade NAT safety)', () => {
     const cur = [
       log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/' }),

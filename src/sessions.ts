@@ -56,6 +56,8 @@ export function isSameSiteReferrer(referrer: string | null | undefined, domain: 
 
 /** Extensions that indicate static asset requests (images, scripts, styles, fonts). */
 const STATIC_ASSET_RE = /\.(css|js|mjs|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot)(\?|$)/i;
+/** The crawl-policy file. No browser requests it on its own; see detectSpoofedBrowsers. */
+export const ROBOTS_TXT_RE = /^\/robots\.txt(\?|$)/i;
 
 /**
  * Build per-IP session profiles from access log entries.
@@ -524,10 +526,20 @@ export function parseBrowserVersion(
  *    the newest version of that family seen among pairs that DID load assets
  *    (or behind `referenceMajors[family]` when supplied)
  *
+ * A second, independent trigger (`robotsFetchers`, default on): a browser-UA
+ * pair that requested `/robots.txt` and never loaded a static asset. No browser
+ * fetches the crawl-policy file on its own, and a person who types the URL in
+ * also renders pages, which loads assets. Referrers, request count, and browser
+ * version are ignored here: in October 2026 logs this caught datacenter crawlers
+ * on current Chrome builds that faked same-site referrers on every request, and
+ * three distributed robots.txt surveys rotating one frozen browser UA across
+ * dozens of IPs. 355 of 374 such pairs had no asset load; the 19 that did were
+ * real sessions in which someone also opened robots.txt.
+ *
  * Shared-IP safety: the key is IP+UA, not IP; single-request pairs are never
- * touched (a returning visitor with cached assets looks the same as a single
- * hit); and the version test keeps carrier-grade NAT safe, since current
- * browser versions can never be demoted.
+ * touched by the version test (a returning visitor with cached assets looks the
+ * same as a single hit); and the version test keeps carrier-grade NAT safe,
+ * since current browser versions can never be demoted by it.
  */
 export function detectSpoofedBrowsers(
   classifiedEntries: ClassifiedEntry[],
@@ -536,11 +548,13 @@ export function detectSpoofedBrowsers(
 ): ClassifiedEntry[] {
   const minRequests = options?.minRequests ?? 2;
   const staleMajors = { ...DEFAULT_STALE_MAJORS, ...options?.staleMajors };
+  const robotsFetchers = options?.robotsFetchers ?? true;
 
   type Pair = {
     n: number;
     assets: boolean;
     selfRef: boolean;
+    robots: boolean;
     parsed: ReturnType<typeof parseBrowserVersion>;
   };
   const pairs = new Map<string, Pair>();
@@ -548,12 +562,19 @@ export function detectSpoofedBrowsers(
     const key = `${entry.ip}|||${entry.userAgent}`;
     let p = pairs.get(key);
     if (!p) {
-      p = { n: 0, assets: false, selfRef: false, parsed: parseBrowserVersion(entry.userAgent) };
+      p = {
+        n: 0,
+        assets: false,
+        selfRef: false,
+        robots: false,
+        parsed: parseBrowserVersion(entry.userAgent),
+      };
       pairs.set(key, p);
     }
     p.n++;
     if (STATIC_ASSET_RE.test(entry.path)) p.assets = true;
     if (isSameSiteReferrer(entry.referrer, domain)) p.selfRef = true;
+    if (ROBOTS_TXT_RE.test(entry.path)) p.robots = true;
   }
 
   // Reference: newest major per family among pairs that behave like browsers.
@@ -568,7 +589,12 @@ export function detectSpoofedBrowsers(
 
   const demote = new Set<string>();
   for (const [key, p] of pairs) {
-    if (!p.parsed || p.n < minRequests || p.assets || p.selfRef) continue;
+    if (!p.parsed || p.assets) continue;
+    if (robotsFetchers && p.robots) {
+      demote.add(key);
+      continue;
+    }
+    if (p.n < minRequests || p.selfRef) continue;
     const ref = reference[p.parsed.family];
     if (ref === undefined) continue;
     if (p.parsed.major <= ref - staleMajors[p.parsed.family]) demote.add(key);

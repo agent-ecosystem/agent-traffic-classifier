@@ -166,6 +166,12 @@ export interface SpoofedBrowserOptions {
    * static assets. Families with no reference are never demoted.
    */
   referenceMajors?: Partial<Record<BrowserFamily, number>>;
+  /**
+   * Also demote any browser-UA pair that requested `/robots.txt` and never
+   * loaded a static asset, regardless of request count, referrers, or browser
+   * version. Default true.
+   */
+  robotsFetchers?: boolean;
 }
 
 /** Options for detectScanners. */
