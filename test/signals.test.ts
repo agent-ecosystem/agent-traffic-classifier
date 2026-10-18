@@ -95,6 +95,26 @@ describe('createSignalClassifier', () => {
       expect(result.company).toBe('Anomaly');
     });
 
+    it('identifies Antigravity from its bare UA even with no Accept header', () => {
+      // Controlled test 2026-10-18: UA is the only request header beyond Host.
+      for (const [path, trigger] of [
+        ['llms.txt', 'llms-txt'],
+        ['index.md', 'direct-md'],
+      ] as const) {
+        const result = classifySignalEntry(
+          makeSignalEntry({
+            ip: '66.249.87.169',
+            path,
+            trigger,
+            headers: { 'User-Agent': 'Google-Jetski-Antigravity' },
+          }),
+        );
+        expect(result.isAgent).toBe(true);
+        expect(result.name).toBe('Antigravity');
+        expect(result.company).toBe('Google');
+      }
+    });
+
     it('identifies current OpenCode builds by their self-identifying UA', () => {
       const entry = makeSignalEntry({
         trigger: 'content-negotiation',

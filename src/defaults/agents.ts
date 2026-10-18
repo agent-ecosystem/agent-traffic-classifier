@@ -13,6 +13,10 @@ export const DEFAULT_KNOWN_AGENTS: Array<{ pattern: string; name: string; compan
   // OpenCode's webfetch tool since 2026-08-19 (anomalyco/opencode #43330).
   { pattern: 'OpenCode-User', name: 'OpenCode', company: 'Anomaly' },
   { pattern: 'Augment-WebFetch', name: 'Augment Code', company: 'Augment Code' },
+  // Google Antigravity's fetch: the UA is the whole header set (no Accept, no
+  // Accept-Language), sent from Google's rate-limited-proxy range, not the
+  // user's IP. Controlled test 2026-10-18. "Jetski" is the internal codename.
+  { pattern: 'Google-Jetski-Antigravity', name: 'Antigravity', company: 'Google' },
 ];
 
 /** Known dev tools: stay as programmatic, never promoted to agent. */

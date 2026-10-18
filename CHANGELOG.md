@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/) with 0.x semantics: minor versions may change classification behavior.
 
+## [0.6.1] - 2026-10-18
+
+### Added
+
+- Bot database and `DEFAULT_KNOWN_AGENTS`: Google Antigravity (`Google-Jetski-Antigravity`, category `agent`). Confirmed by a controlled test on 2026-10-18: the user agent is the entire header set (no `Accept`, no `Accept-Language`), sent over HTTP/1.1 from Google's `rate-limited-proxy-*.google.com` range (`66.249.87.160/27`, in Google's published special-crawlers list), not from the user's IP. Previously `other-bot` in access logs via isbot, and "unidentified" in the signal classifier, where the missing `Accept` header defeats every heuristic.
+
 ## [0.6.0] - 2026-10-18
 
 Based on an audit of a week of live traffic (October 11 to 18, 2026) across twelve sites, a controlled Cursor test, and a read of OpenCode's source. Two identities changed. The `Traceparent` + `B3` + markdown-first traffic that was "Cursor" from April and "traced proxy agent" from September is OpenCode: its webfetch tool hardcodes that Accept header, sent a generic Chrome/143 UA until 2026-08-19, and now self-identifies as `OpenCode-User`. And Cursor's own fetch, which runs on Exa, now arrives as `ExaUser/1.0`: the 2026-10-18 controlled test produced the September fingerprint (one request per page from rotating proxy IPs, Exa's Accept header, no-cache headers, no `Sec-Ch-Ua`) under that UA, with Web Bot Auth signatures and an unprompted `robots.txt` fetch. The confirmed Cursor fingerprint had zero hits in the week, and ExaUser was falling through to "Cursor (suspected)".

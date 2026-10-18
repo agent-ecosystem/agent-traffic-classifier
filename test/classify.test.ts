@@ -277,6 +277,13 @@ describe('createClassifier', () => {
       expect(result.botCompany).toBe('Anomaly');
     });
 
+    it('classifies the bare Google-Jetski-Antigravity UA as agent (Antigravity, Google)', () => {
+      const result = classify('Google-Jetski-Antigravity');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('Antigravity');
+      expect(result.botCompany).toBe('Google');
+    });
+
     it('classifies Augment-WebFetch, agent-browser, and KiroServer as agents', () => {
       expect(classify('Augment-WebFetch/1.0').botName).toBe('Augment Code');
       expect(classify('agent-browser/0.34.0 read').category).toBe('agent');

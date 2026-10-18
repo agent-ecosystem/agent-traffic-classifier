@@ -1136,6 +1136,12 @@
       "category": "feed-reader"
     },
     {
+      "pattern": "Google-Jetski-Antigravity",
+      "name": "Antigravity",
+      "company": "Google",
+      "category": "agent"
+    },
+    {
       "pattern": "OpenCode-User",
       "name": "OpenCode",
       "company": "Anomaly",
