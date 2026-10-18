@@ -173,7 +173,7 @@ describe('detectDuplicateRequestAgents', () => {
     const agentEntry = result.find((e) => e.classification.category === 'agent');
     const dupEntry = result.find((e) => e.classification.proxyDuplicate);
     expect(agentEntry).toBeDefined();
-    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
+    expect(agentEntry!.classification.botName).toBe('proxy agent (suspected)');
     expect(dupEntry).toBeDefined();
   });
 
@@ -192,7 +192,7 @@ describe('detectDuplicateRequestAgents', () => {
     expect(result.every((e) => !e.classification.proxyDuplicate)).toBe(true);
   });
 
-  it('promotes unidentified agent + duplicate pattern to confirmed Cursor', () => {
+  it('promotes unidentified agent + duplicate pattern to a confirmed proxy agent', () => {
     const entries: ClassifiedEntry[] = [
       {
         entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
@@ -207,8 +207,8 @@ describe('detectDuplicateRequestAgents', () => {
     const agentEntry = result.find(
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
-    expect(agentEntry!.classification.botName).toBe('Cursor');
-    expect(agentEntry!.classification.botCompany).toBe('Anysphere');
+    expect(agentEntry!.classification.botName).toBe('proxy agent');
+    expect(agentEntry!.classification.botCompany).toBeNull();
   });
 
   it('returns original entries when no duplicates found', () => {
@@ -250,11 +250,11 @@ describe('detectDuplicateRequestAgents', () => {
     expect(result.every((e) => !e.classification.proxyDuplicate)).toBe(true);
   });
 
-  it('preserves named agent when paired with human (nameA is named agent)', () => {
+  it('preserves an already-attributed proxy agent when paired with human (nameA is named agent)', () => {
     const entries: ClassifiedEntry[] = [
       {
         entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
-        classification: { category: 'agent', botName: 'Cursor', botCompany: 'Anysphere' },
+        classification: { category: 'agent', botName: 'proxy agent', botCompany: null },
       },
       {
         entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
@@ -265,12 +265,12 @@ describe('detectDuplicateRequestAgents', () => {
     const primary = result.find(
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
-    expect(primary!.classification.botName).toBe('Cursor');
+    expect(primary!.classification.botName).toBe('proxy agent');
     expect(primary!.entry.ip).toBe('1.1.1.1');
     expect(result.find((e) => e.classification.proxyDuplicate)).toBeDefined();
   });
 
-  it('preserves named agent when paired with human (nameB is named agent)', () => {
+  it('preserves an already-attributed proxy agent when paired with human (nameB is named agent)', () => {
     const entries: ClassifiedEntry[] = [
       {
         entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
@@ -278,14 +278,14 @@ describe('detectDuplicateRequestAgents', () => {
       },
       {
         entry: makeLogEntry({ ip: '2.2.2.2', path: '/page', userAgent: 'Chrome/120' }),
-        classification: { category: 'agent', botName: 'Cursor', botCompany: 'Anysphere' },
+        classification: { category: 'agent', botName: 'proxy agent', botCompany: null },
       },
     ];
     const result = detectDuplicateRequestAgents(entries);
     const primary = result.find(
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
-    expect(primary!.classification.botName).toBe('Cursor');
+    expect(primary!.classification.botName).toBe('proxy agent');
     expect(primary!.entry.ip).toBe('2.2.2.2');
     expect(result.find((e) => e.classification.proxyDuplicate)).toBeDefined();
   });
@@ -451,7 +451,7 @@ describe('detectDuplicateRequestAgents with session profiles', () => {
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
     expect(agentEntry).toBeDefined();
-    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
+    expect(agentEntry!.classification.botName).toBe('proxy agent (suspected)');
   });
 
   it('still labels suspected when only one IP has browser-like session', () => {
@@ -474,10 +474,10 @@ describe('detectDuplicateRequestAgents with session profiles', () => {
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
     expect(agentEntry).toBeDefined();
-    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
+    expect(agentEntry!.classification.botName).toBe('proxy agent (suspected)');
   });
 
-  it('does not suppress confirmed Cursor (signal-corroborated) even with browser sessions', () => {
+  it('does not suppress a confirmed proxy agent (signal-corroborated) even with browser sessions', () => {
     const entries: ClassifiedEntry[] = [
       {
         entry: makeLogEntry({ ip: '1.1.1.1', path: '/page', userAgent: 'Chrome/120' }),
@@ -496,8 +496,8 @@ describe('detectDuplicateRequestAgents with session profiles', () => {
     const agentEntry = result.find(
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
-    // Signal data + duplicate = confirmed Cursor, not affected by session gate
-    expect(agentEntry!.classification.botName).toBe('Cursor');
+    // Signal data + duplicate = confirmed proxy agent, not affected by session gate
+    expect(agentEntry!.classification.botName).toBe('proxy agent');
   });
 
   it('requires BOTH static assets and self-referrer to suppress', () => {
@@ -521,7 +521,7 @@ describe('detectDuplicateRequestAgents with session profiles', () => {
       (e) => e.classification.category === 'agent' && !e.classification.proxyDuplicate,
     );
     expect(agentEntry).toBeDefined();
-    expect(agentEntry!.classification.botName).toBe('Cursor (suspected)');
+    expect(agentEntry!.classification.botName).toBe('proxy agent (suspected)');
   });
 });
 

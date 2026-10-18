@@ -267,6 +267,148 @@ describe('createClassifier', () => {
     });
   });
 
+  describe('patterns added from October 2026 traffic', () => {
+    it('classifies OpenCode-User as agent', () => {
+      const result = classify(
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OpenCode-User/1.0; +https://opencode.ai',
+      );
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('OpenCode');
+      expect(result.botCompany).toBe('Anomaly');
+    });
+
+    it('classifies Augment-WebFetch, agent-browser, and KiroServer as agents', () => {
+      expect(classify('Augment-WebFetch/1.0').botName).toBe('Augment Code');
+      expect(classify('agent-browser/0.34.0 read').category).toBe('agent');
+      expect(classify('agent-browser/0.34.0 read').botCompany).toBe('Vercel');
+      expect(classify('KiroServer/1.0').botName).toBe('Kiro');
+      expect(classify('KiroServer/1.0').category).toBe('agent');
+    });
+
+    it("classifies Qoder's China build (qoderclicn) as Qoder CLI", () => {
+      const result = classify('qoderclicn/1.1.59 (+https://qoder.cn)');
+      expect(result.category).toBe('agent');
+      expect(result.botName).toBe('Qoder CLI');
+    });
+
+    it('classifies ExaUser as ai-assistant (Cursor fetches arrive under this UA since late September 2026)', () => {
+      const result = classify(
+        'Mozilla/5.0 (compatible; ExaUser/1.0; +https://crawler.exa.ai/exauser)',
+      );
+      expect(result.category).toBe('ai-assistant');
+      expect(result.botName).toBe('ExaUser');
+      expect(result.botCompany).toBe('Exa');
+    });
+
+    it('keeps ExaBot and ExaSearchBot distinct from ExaUser', () => {
+      expect(classify('Mozilla/5.0 (compatible; ExaBot/1.0; +https://exa.ai/bot)').botName).toBe(
+        'ExaBot',
+      );
+      expect(classify('Mozilla/5.0 (compatible; ExaBot/1.0; +https://exa.ai/bot)').category).toBe(
+        'ai-search',
+      );
+      expect(
+        classify('Mozilla/5.0 (compatible; ExaSearchBot/1.0; +https://crawler.exa.ai/)').botName,
+      ).toBe('ExaSearchBot');
+    });
+
+    it('classifies OpenAI File Downloader as ai-assistant', () => {
+      const result = classify('OpenAI File Downloader, XaiImageApiFetch/1.0');
+      expect(result.category).toBe('ai-assistant');
+      expect(result.botCompany).toBe('OpenAI');
+    });
+
+    it('classifies Gensparkbot as ai-search', () => {
+      const result = classify(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Gensparkbot',
+      );
+      expect(result.category).toBe('ai-search');
+      expect(result.botCompany).toBe('Genspark');
+    });
+
+    it('classifies ElevenLabs and Bedrock knowledge-base fetchers as ai-crawler', () => {
+      expect(
+        classify(
+          'Mozilla/5.0 (compatible; ElevenlabsCrawler/1.0; +https://elevenlabs.io/docs/bots)',
+        ).category,
+      ).toBe('ai-crawler');
+      expect(classify('amazon-bedrock-knowledgebase-on-behalf-of-b8af81b3').category).toBe(
+        'ai-crawler',
+      );
+    });
+
+    it('classifies new independent search engines as search-crawler', () => {
+      for (const ua of [
+        'Mozilla/5.0 (compatible; ibou-search/2.0; +https://ibou.com/crawlers.html)',
+        'ElamurBot/1.0 (+https://bot.elamur.ai/)',
+        'Mozilla/5.0 (compatible; LoadedBot/1.0; +https://loaded.ai/bot)',
+        'Mozilla/5.0 (compatible; FindgBot/1.0; +https://khojbee.com/bot)',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko; compatible; Yeti/1.1; +https://naver.me/spd) Chrome/149.0.0.0 Safari/537.36',
+      ]) {
+        expect(classify(ua).category, ua).toBe('search-crawler');
+      }
+    });
+
+    it('classifies generic Nutch as search-crawler without stealing SSI-Nutch', () => {
+      expect(
+        classify(
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36/Nutch-1.23-SNAPSHOT',
+        ).botName,
+      ).toBe('Apache Nutch');
+      expect(
+        classify('SSI-Nutch/1.23 (SSI broad web crawler; https://ssi.inc/; adi@ssi.inc)').category,
+      ).toBe('ai-crawler');
+    });
+
+    it('classifies lead-generation and marketing crawlers as seo-bot', () => {
+      expect(
+        classify('SunriseTranscriptionReach/1.0 (+https://sunrisetranscription.com)').category,
+      ).toBe('seo-bot');
+      expect(
+        classify(
+          'Mozilla/5.0 (compatible; MomentLeadsBot/1.0; +mailto:abuse@moment-leads.com) AppleWebKit/537.36',
+        ).category,
+      ).toBe('seo-bot');
+      expect(
+        classify(
+          'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; HubSpot Crawler; +https://www.hubspot.com) Chrome/131.0.0.0 Safari/537.36',
+        ).botName,
+      ).toBe('HubSpot Crawler');
+    });
+
+    it('classifies news aggregators and read-later apps as feed-reader', () => {
+      expect(classify('Mozilla/5.0 (compatible; BriskBot/1.0; +https://brisk.news)').category).toBe(
+        'feed-reader',
+      );
+      expect(classify('DaypopBot/2.0 (+https://daypop.com/bot)').category).toBe('feed-reader');
+      expect(classify('Mozilla/5.0 (RSS digest)').category).toBe('feed-reader');
+      expect(classify('Instapaper/177 CFNetwork/3860.700.2 Darwin/25.6.0').botName).toBe(
+        'Instapaper',
+      );
+    });
+
+    it('classifies KakaoBot and WebexTeams as social-preview', () => {
+      expect(
+        classify(
+          'Mozilla/5.0 (compatible; KakaoBot/1.0; +https://cs.kakao.com/helps_html/1073213012)',
+        ).category,
+      ).toBe('social-preview');
+      expect(classify('WebexTeams').category).toBe('social-preview');
+    });
+
+    it('classifies self-identifying exploit tools and the install.php probe UA as scanner', () => {
+      expect(classify('http://agentminutes.dev/wp-admin/install.php?step=1').category).toBe(
+        'scanner',
+      );
+      expect(classify('wp2shell').category).toBe('scanner');
+      expect(
+        classify('BlackHatTeam/@mrzblackhat (Mozilla/5.0; compatible; PageBuilderCK-Scanner/1.0)')
+          .category,
+      ).toBe('scanner');
+      expect(classify('wildcat-threat-mcp/faviconhash').category).toBe('scanner');
+    });
+  });
+
   describe('programmatic clients', () => {
     it('classifies curl', () => {
       const result = classify('curl/7.68.0');
@@ -339,9 +481,7 @@ describe('createClassifier', () => {
 
   describe('isbot fallback', () => {
     it('catches bots not in our curated list via isbot', () => {
-      const result = classify(
-        'Mozilla/5.0 (compatible; SpiderLing; +https://www.sketchengine.eu/crawler/)',
-      );
+      const result = classify('Mozilla/5.0 (compatible; DiffuseMind/1.0)');
       expect(result.category).toBe('other-bot');
     });
   });

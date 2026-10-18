@@ -103,10 +103,16 @@ export {
   SUSPECTED_AGENTS,
   DEFAULT_ACCEPT_TAXONOMY,
   sentryBaggageHeuristic,
+  exaFetchHeuristic,
   cursorFetchHeuristic,
   tracedProxyHeuristic,
+  openCodeAcceptHeuristic,
   cursorHeuristic,
+  EXA_FETCH_ACCEPT_PREFIX,
+  EXA_FETCH_NAME,
   CURSOR_ACCEPT_PREFIX,
+  OPENCODE_ACCEPT_PREFIXES,
+  OPENCODE_SUSPECTED,
   chrome122Heuristic,
   conversationTrackingHeuristic,
   markdownMimeHeuristic,
@@ -137,6 +143,7 @@ export {
 export {
   DEFAULT_WINDOW_SECONDS,
   DEFAULT_PROXY_WINDOW_SECONDS,
+  DEFAULT_PROXY_AGENT,
   CURSOR_PROXY_AGENT,
 } from './defaults/sessions.js';
 export {

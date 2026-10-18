@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createSignalClassifier } from '../src/signals.js';
+import { exaFetchHeuristic } from '../src/defaults/agents.js';
 import type { SignalEntry } from '../src/types.js';
 
 const toEpoch = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -60,7 +61,7 @@ describe('createSignalClassifier', () => {
       expect(result.name).toBe('traced proxy agent');
     });
 
-    it('labels Traceparent plus Cursor Accept header as Cursor (suspected)', () => {
+    it('labels Traceparent plus the Exa Accept header as a generic traced proxy agent', () => {
       const entry = makeSignalEntry({
         headers: {
           'User-Agent': 'Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36',
@@ -71,12 +72,77 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor (suspected)');
-      expect(result.company).toBe('Anysphere');
-      expect(result.company).toBe('Anysphere');
+      expect(result.name).toBe('traced proxy agent');
     });
 
-    it('detects Cursor definitively via Sentry Baggage header', () => {
+    it('labels Traceparent plus B3 plus OpenCode Accept from a generic Chrome UA as OpenCode (suspected)', () => {
+      // Fingerprint of OpenCode builds before 2026-08-19 (generic Chrome/143 UA), observed live 2026-10.
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+          Accept:
+            'text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1',
+          'Accept-Language': 'en-US,en;q=0.9',
+          Traceparent: '00-ef5e51cfd96de010b00c3cdc690dd849-aacb7ec604dfd202-01',
+          B3: 'ef5e51cfd96de010b00c3cdc690dd849-aacb7ec604dfd202-1-760afbf0b83f916f',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('OpenCode (suspected)');
+      expect(result.company).toBe('Anomaly');
+    });
+
+    it('identifies current OpenCode builds by their self-identifying UA', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OpenCode-User/1.0; +https://opencode.ai',
+          Accept:
+            'text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1',
+          Traceparent: '00-43fb558acace72a14e43c9d7b7936fc1-938e7c262d307543-01',
+          B3: '43fb558acace72a14e43c9d7b7936fc1-938e7c262d307543-1-434a23000e3c10c7',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('OpenCode');
+      expect(result.company).toBe('Anomaly');
+    });
+
+    it('labels each of the three OpenCode Accept headers as OpenCode (suspected) even without tracing headers', () => {
+      const accepts = [
+        'text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1',
+        'text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1',
+        'text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1',
+      ];
+      for (const Accept of accepts) {
+        const result = classifySignalEntry(
+          makeSignalEntry({
+            trigger: 'content-negotiation',
+            headers: { 'User-Agent': 'SomeClient/1.0', Accept },
+          }),
+        );
+        expect(result.isAgent).toBe(true);
+        expect(result.name).toBe('OpenCode (suspected)');
+      }
+    });
+
+    it('does not label a plain text/x-markdown Accept as OpenCode', () => {
+      const result = classifySignalEntry(
+        makeSignalEntry({
+          trigger: 'content-negotiation',
+          headers: { 'User-Agent': 'SomeClient/1.0', Accept: 'text/x-markdown, text/markdown' },
+        }),
+      );
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('markdown agent');
+    });
+
+    it('reports the April 2026 Sentry Baggage key as OpenCode (suspected)', () => {
       const entry = makeSignalEntry({
         headers: {
           'User-Agent': 'Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36',
@@ -88,11 +154,11 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor');
-      expect(result.company).toBe('Anysphere');
+      expect(result.name).toBe('OpenCode (suspected)');
+      expect(result.company).toBe('Anomaly');
     });
 
-    it('identifies Cursor by its confirmed fetch fingerprint (September 2026 controlled test)', () => {
+    it('labels the unlabelled Exa fetch fingerprint (Cursor until September 2026) as Exa fetch (suspected)', () => {
       const entry = makeSignalEntry({
         trigger: 'content-negotiation',
         headers: {
@@ -108,11 +174,28 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor');
-      expect(result.company).toBe('Anysphere');
+      expect(result.name).toBe('Exa fetch (suspected)');
+      expect(result.company).toBeNull();
     });
 
-    it('does not apply the Cursor fetch fingerprint when Sec-Ch-Ua or the no-cache headers are missing', () => {
+    it('routes ExaUser (Cursor fetch since late September 2026) to the bot database, not the heuristics', () => {
+      // Controlled Cursor test 2026-10-18: every request arrived as ExaUser with
+      // the same Accept and no-cache headers as before, plus Web Bot Auth.
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ExaUser/1.0; +https://crawler.exa.ai/exauser)',
+          Accept:
+            'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          'Signature-Agent': '"https://crawler.exa.ai"',
+        },
+      });
+      expect(classifySignalEntry(entry).isAgent).toBe(false);
+    });
+
+    it('does not apply the Exa fetch fingerprint when Sec-Ch-Ua or the no-cache headers are missing', () => {
       const base = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/145.0.0.0 Safari/537.36',
         Accept:
@@ -120,19 +203,20 @@ describe('createSignalClassifier', () => {
         'Cache-Control': 'no-cache',
         Pragma: 'no-cache',
       };
-      const withClientHints = classifySignalEntry(
-        makeSignalEntry({
-          trigger: 'content-negotiation',
-          headers: { ...base, 'Sec-Ch-Ua': '"Chromium";v="145"' },
-        }),
-      );
-      expect(withClientHints.name).not.toBe('Cursor');
+      const withClientHints = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: { ...base, 'Sec-Ch-Ua': '"Chromium";v="145"' },
+      });
+      expect(exaFetchHeuristic(withClientHints)).toBeNull();
+      // The chain still names it via the Accept-only taxonomy entry
+      expect(classifySignalEntry(withClientHints).name).toBe('Exa fetch (suspected)');
       const { Pragma: _p, ...noPragma } = base;
       const withoutPragma = classifySignalEntry(
         makeSignalEntry({ trigger: 'content-negotiation', headers: noPragma }),
       );
+      // Accept-only match falls through to the taxonomy entry with the same name
       expect(withoutPragma.isAgent).toBe(true);
-      expect(withoutPragma.name).toBe('Cursor (suspected)');
+      expect(withoutPragma.name).toBe('Exa fetch (suspected)');
     });
 
     it('does not trigger Sentry heuristic for different sentry-public_key', () => {
@@ -162,7 +246,7 @@ describe('createSignalClassifier', () => {
       expect(result.name).toBe('traced proxy agent');
     });
 
-    it('does not trigger Cursor heuristic when Code/ is in UA (VS Code)', () => {
+    it('does not trigger the traced proxy heuristic when Code/ is in UA (VS Code)', () => {
       const entry = makeSignalEntry({
         headers: {
           'User-Agent': 'Mozilla/5.0 Code/1.90.0 Chrome/120.0.0.0',
@@ -170,8 +254,9 @@ describe('createSignalClassifier', () => {
         },
       });
       const result = classifySignalEntry(entry);
-      // Should not be Cursor since Code/ indicates VS Code/Copilot
-      expect(result.name).not.toBe('Cursor');
+      // Code/ indicates VS Code/Copilot; the bot database names it
+      expect(result.name).not.toBe('traced proxy agent');
+      expect(result.name).toBe('GitHub Copilot');
     });
 
     it('classifies unknown UA with agent trigger as unidentified', () => {
@@ -295,8 +380,7 @@ describe('createSignalClassifier', () => {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-          Accept:
-            'text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1',
+          Accept: 'text/markdown, text/x-markdown;q=0.9, */*;q=0.1',
         },
       });
       const result = classifySignalEntry(entry);
@@ -304,7 +388,7 @@ describe('createSignalClassifier', () => {
       expect(result.name).toBe('markdown agent');
     });
 
-    it('Chrome 122 heuristic takes priority over Cursor for matching entries', () => {
+    it('Chrome 122 heuristic takes priority over the traced proxy heuristic for matching entries', () => {
       const entry = makeSignalEntry({
         headers: {
           'User-Agent':
@@ -567,7 +651,20 @@ describe('createSignalClassifier', () => {
   });
 
   describe('Accept header taxonomy', () => {
-    it('detects text-first agent pattern', () => {
+    it('labels the full text-first Accept (OpenCode text format) as OpenCode (suspected)', () => {
+      const entry = makeSignalEntry({
+        trigger: 'content-negotiation',
+        headers: {
+          'User-Agent': 'SomeClient/1.0',
+          Accept: 'text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1',
+        },
+      });
+      const result = classifySignalEntry(entry);
+      expect(result.isAgent).toBe(true);
+      expect(result.name).toBe('OpenCode (suspected)');
+    });
+
+    it('labels a partial text-first Accept as a text-first agent via the taxonomy', () => {
       const entry = makeSignalEntry({
         trigger: 'content-negotiation',
         headers: {
@@ -619,7 +716,7 @@ describe('createSignalClassifier', () => {
       expect(result.name).toBe('markdown agent (minimal)');
     });
 
-    it('labels an Accept-only Cursor match as suspected via the taxonomy', () => {
+    it('labels an Accept-only Exa fingerprint match as Exa fetch (suspected) via the taxonomy', () => {
       const entry = makeSignalEntry({
         trigger: 'content-negotiation',
         headers: {
@@ -630,7 +727,7 @@ describe('createSignalClassifier', () => {
       });
       const result = classifySignalEntry(entry);
       expect(result.isAgent).toBe(true);
-      expect(result.name).toBe('Cursor (suspected)');
+      expect(result.name).toBe('Exa fetch (suspected)');
     });
 
     it('detects got-pattern agent via Accept taxonomy', () => {

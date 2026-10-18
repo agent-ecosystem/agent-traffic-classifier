@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/) with 0.x semantics: minor versions may change classification behavior.
 
+## [0.6.0] - 2026-10-18
+
+Based on an audit of a week of live traffic (October 11 to 18, 2026) across twelve sites, a controlled Cursor test, and a read of OpenCode's source. Two identities changed. The `Traceparent` + `B3` + markdown-first traffic that was "Cursor" from April and "traced proxy agent" from September is OpenCode: its webfetch tool hardcodes that Accept header, sent a generic Chrome/143 UA until 2026-08-19, and now self-identifies as `OpenCode-User`. And Cursor's own fetch, which runs on Exa, now arrives as `ExaUser/1.0`: the 2026-10-18 controlled test produced the September fingerprint (one request per page from rotating proxy IPs, Exa's Accept header, no-cache headers, no `Sec-Ch-Ua`) under that UA, with Web Bot Auth signatures and an unprompted `robots.txt` fetch. The confirmed Cursor fingerprint had zero hits in the week, and ExaUser was falling through to "Cursor (suspected)".
+
+### Changed
+
+- **Nothing is attributed to Cursor any more.** Cursor is one of possibly many clients behind `ExaUser`, which the bot database now routes to `ai-assistant` before the heuristics run (the same fix ExaSearchBot got in 0.3.0). Consequences: Cursor's traffic leaves the `agent` category; `cursorFetchHeuristic` is renamed `exaFetchHeuristic` and reports "Exa fetch (suspected)" with no company; the Accept-taxonomy entry for that header carries the same name; `CURSOR_ACCEPT_PREFIX` is renamed `EXA_FETCH_ACCEPT_PREFIX`. The old names remain as deprecated aliases.
+- **`tracedProxyHeuristic` reports "OpenCode (suspected)"** when the Accept header is one of OpenCode's, and "traced proxy agent" otherwise. The Exa-Accept branch that returned "Cursor (suspected)" is gone.
+- **`sentryBaggageHeuristic` reports "OpenCode (suspected)"** instead of "Cursor". The key co-occurred with OpenCode's Accept header and tracing headers in April 2026, OpenCode's desktop app ships Sentry, and Cursor's controlled tests have never produced Sentry headers. The key itself has not been matched to a project.
+- **`detectDuplicateRequestAgents` no longer names Cursor by default.** The new default `DEFAULT_PROXY_AGENT` reports "proxy agent" / "proxy agent (suspected)" with no company. `CURSOR_PROXY_AGENT` is still exported (deprecated) for consumers who want the old labels via `proxyAgent`. `ProxyAgentConfig.company` is now `string | null`.
+
+### Added
+
+- `openCodeAcceptHeuristic`: matches any of the three Accept preference lists hardcoded in OpenCode's webfetch tool (`OPENCODE_ACCEPT_PREFIXES`), regardless of UA or tracing headers, and reports `OPENCODE_SUSPECTED`. Runs after `tracedProxyHeuristic`.
+- `EXA_FETCH_NAME`, `OPENCODE_ACCEPT_PREFIXES`, `OPENCODE_SUSPECTED`, `DEFAULT_PROXY_AGENT`.
+- `DEFAULT_KNOWN_AGENTS`: `OpenCode-User`, `Augment-WebFetch`.
+- Bot database, agents: OpenCode (`OpenCode-User`), Augment Code (`Augment-WebFetch`), Vercel's `agent-browser`, `KiroServer` (only `Kiro-CLI` matched before), Qoder's China build (`qoderclicn/`).
+- Bot database, AI: `ExaUser` and `OpenAI File Downloader` and QuillBot (ai-assistant); `ExaBot`, Gensparkbot, TalarionSearchBot, NagetBot, AgentDiscoveryIndex (ai-search); ElevenLabs Crawler, Amazon Bedrock Knowledge Base, Recraft image dataset, AbliterantBot, CMU ClueWeb Crawler, Sketch Engine SpiderLing, llmstxtcrawler (ai-crawler).
+- Bot database, everything else seen at volume in the week: twenty-two independent search engines (ibou-search, ElamurBot, LoadedBot, FindgBot, TrellisBot, CGMSearchBot, AstianGOBot, interCrawlerBot, LanternBot, Naver's Yeti, generic Apache Nutch, Mwmbl, and others), lead-generation and marketing crawlers as `seo-bot` (SunriseTranscriptionReach, Moment Leads, HubSpot Crawler, Dataprovider.com, Pandalytics, Netcraft, Serpstat, AgentFitBot, and others), news aggregators and read-later apps as `feed-reader` (BriskBot, DaypopBot, Downread, Caterpillar, Instapaper, RSS Amplifier, `(RSS digest)`, and others), KakaoBot and Webex Teams as `social-preview`.
+- Bot database, scanners: `wp2shell`, `PageBuilderCK-Scanner`, `HxC-Endpoint-Discovery`, `redirect-scanner`, `wildcat-threat-mcp`, and the user agent that is literally `http://<site>/wp-admin/install.php?step=1` (423 probes from one Cloudflare Workers egress IP in the audit week, previously `other-bot` via isbot).
+
+### Notes from the audit
+
+- `detectScanners` (0.5.0) and `detectSpoofedBrowsers` (0.4.0) held up: a 3,204-request backup-archive sweep (`*.zip`, six seconds, one AWS IP) was demoted to `scanner`, no fake-referrer session reached the referrer stats, and the spoofed-browser pass moved roughly 9,400 filtered requests out of `human`, mostly Tencent and China Unicom addresses with frozen early-2024 browser UAs.
+- Known gaps, unchanged: a datacenter crawler that sends same-site referrers survives `detectSpoofedBrowsers` (it is exempted as navigation), and one running a current browser version is never stale enough to demote.
+- New request headers: `X-Openai-Host-Hash` on GPTBot and OAI-SearchBot; Alibaba EagleEye `Baggage` on a Go-http-client markdown fetcher. Not used as heuristics yet.
+
 ## [0.5.0] - 2026-09-25
 
 Based on a scanner session captured on 2026-09-18: one datacenter IP made 839 requests in 95 minutes, rotating through fifteen browser user agents and attaching a fake referrer (Reddit, Facebook, Google, Hacker News, Twitter, or a random search-engine or t.co URL) to each one. The probes themselves were dropped by the filter, but the rest of the session classified as `human` and put Reddit and Hacker News at the top of the site's referral sources. A review across five sites and eight days then found `.env` sweeps from Google Cloud addresses, an AI-agent credential harvester, a Next.js server-action RCE probe, a Joomla RCE probe with a self-identifying user agent, and CMS fingerprinters, plus one legitimate benchmark crawler that a first draft of the detector would have mislabelled.

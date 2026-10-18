@@ -1136,6 +1136,438 @@
       "category": "feed-reader"
     },
     {
+      "pattern": "OpenCode-User",
+      "name": "OpenCode",
+      "company": "Anomaly",
+      "category": "agent"
+    },
+    {
+      "pattern": "Augment-WebFetch",
+      "name": "Augment Code",
+      "company": "Augment Code",
+      "category": "agent"
+    },
+    {
+      "pattern": "agent-browser/",
+      "name": "agent-browser",
+      "company": "Vercel",
+      "category": "agent"
+    },
+    {
+      "pattern": "KiroServer",
+      "name": "Kiro",
+      "company": "Amazon",
+      "category": "agent"
+    },
+    {
+      "pattern": "qoderclicn/",
+      "name": "Qoder CLI",
+      "company": "Alibaba",
+      "category": "agent"
+    },
+    {
+      "pattern": "ExaUser",
+      "name": "ExaUser",
+      "company": "Exa",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "OpenAI File Downloader",
+      "name": "OpenAI File Downloader",
+      "company": "OpenAI",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "quillbot.com",
+      "name": "QuillBot",
+      "company": "QuillBot",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "ExaBot",
+      "name": "ExaBot",
+      "company": "Exa",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "Gensparkbot",
+      "name": "Gensparkbot",
+      "company": "Genspark",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "TalarionSearchBot",
+      "name": "TalarionSearchBot",
+      "company": "Talarion",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "NagetBot",
+      "name": "NagetBot",
+      "company": "Naget",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "AgentDiscoveryIndex",
+      "name": "AgentDiscoveryIndex",
+      "company": "Montexi",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "ElevenlabsCrawler",
+      "name": "ElevenLabs Crawler",
+      "company": "ElevenLabs",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "amazon-bedrock-knowledgebase",
+      "name": "Amazon Bedrock Knowledge Base",
+      "company": "Amazon",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "recraft-image-dataset",
+      "name": "Recraft image dataset",
+      "company": "Recraft",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "AbliterantBot",
+      "name": "AbliterantBot",
+      "company": "Abliterant",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "ClueWeb-Crawler",
+      "name": "ClueWeb Crawler",
+      "company": "Carnegie Mellon University",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "SpiderLing",
+      "name": "SpiderLing",
+      "company": "Sketch Engine",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "llmstxtcrawler",
+      "name": "llmstxtcrawler",
+      "company": "llmstxt.rocks",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "ibou-search",
+      "name": "ibou-search",
+      "company": "ibou",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "ElamurBot",
+      "name": "ElamurBot",
+      "company": "Elamur",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "LoadedBot",
+      "name": "LoadedBot",
+      "company": "Loaded",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "FindgBot",
+      "name": "FindgBot",
+      "company": "Findg",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Trellisbot",
+      "name": "TrellisBot",
+      "company": "TrellisSearch",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "CGMSearchBot",
+      "name": "CGMSearchBot",
+      "company": "CGMIMM",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "AstianGOBot",
+      "name": "AstianGOBot",
+      "company": "Astian",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "interCrawlerBot",
+      "name": "interCrawlerBot",
+      "company": "interPost",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "LanternBot",
+      "name": "LanternBot",
+      "company": "Lantern",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "SerbisSearchBot",
+      "name": "SerbisSearchBot",
+      "company": "Serbis",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "IdarusBot",
+      "name": "IdarusBot",
+      "company": "Idarus",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "MonacoSearchBot",
+      "name": "MonacoSearchBot",
+      "company": "Monaco Search",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Uruky Site Search",
+      "name": "Uruky Site Search",
+      "company": "Uruky",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "FindnexBot",
+      "name": "FindnexBot",
+      "company": "Findnex",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "dksearch-bot",
+      "name": "dksearch-bot",
+      "company": "Ordbogen",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "YioopBot",
+      "name": "YioopBot",
+      "company": "Yioop",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "rawweb-bot",
+      "name": "rawweb-bot",
+      "company": "RawWeb",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "SextantBot",
+      "name": "SextantBot",
+      "company": "Sextant",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Jambot/",
+      "name": "Jambot",
+      "company": "Jambot",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "mwmbl",
+      "name": "Mwmbl",
+      "company": "Mwmbl",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Yeti/",
+      "name": "Yeti",
+      "company": "Naver",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "Nutch",
+      "name": "Apache Nutch",
+      "company": "Apache",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "SunriseTranscriptionReach",
+      "name": "SunriseTranscriptionReach",
+      "company": "Sunrise Transcription",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "MomentLeadsBot",
+      "name": "Moment Leads",
+      "company": "Moment Leads",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "Moment Leads",
+      "name": "Moment Leads",
+      "company": "Moment Leads",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "LeadFinderBot",
+      "name": "LeadFinderBot",
+      "company": "unknown",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "Dataprovider.com",
+      "name": "Dataprovider.com",
+      "company": "Dataprovider",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "Pandalytics",
+      "name": "Pandalytics",
+      "company": "DomainsBot",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "HubSpot Crawler",
+      "name": "HubSpot Crawler",
+      "company": "HubSpot",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "mentions-app",
+      "name": "mentions-app",
+      "company": "Mentions",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "CheckMarkNetwork",
+      "name": "CheckMark Network",
+      "company": "CheckMark Network",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "NetcraftSurveyAgent",
+      "name": "Netcraft Survey",
+      "company": "Netcraft",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "serpstatbot",
+      "name": "serpstatbot",
+      "company": "Serpstat",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "AgentFitBot",
+      "name": "AgentFitBot",
+      "company": "agentfit.dev",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "SEOlvl",
+      "name": "SEOlvl",
+      "company": "SEOlvl",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "KakaoBot",
+      "name": "KakaoBot",
+      "company": "Kakao",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "WebexTeams",
+      "name": "Webex Teams",
+      "company": "Cisco",
+      "category": "social-preview"
+    },
+    {
+      "pattern": "BriskBot",
+      "name": "BriskBot",
+      "company": "brisk.news",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "DaypopBot",
+      "name": "DaypopBot",
+      "company": "Daypop",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Downread/",
+      "name": "Downread",
+      "company": "Downread",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Caterpillar/",
+      "name": "Caterpillar",
+      "company": "masukomi",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "km-radar",
+      "name": "km-radar",
+      "company": "km-radar",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "ai-news-aggregator",
+      "name": "ai-news-aggregator",
+      "company": "grove-platform",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "(RSS digest)",
+      "name": "RSS digest",
+      "company": "unknown",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Instapaper",
+      "name": "Instapaper",
+      "company": "Instapaper",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "RSSAmplifierBot",
+      "name": "RSS Amplifier",
+      "company": "RSS Amplifier",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "rssamplifier",
+      "name": "RSS Amplifier",
+      "company": "RSS Amplifier",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "FreshDiscovery",
+      "name": "FreshDiscovery",
+      "company": "FreshRSS",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "READAR/",
+      "name": "READAR",
+      "company": "Metcalfe Creative Labs",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Keryx/",
+      "name": "Keryx",
+      "company": "Keryx",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "Wagging/",
+      "name": "Wagging",
+      "company": "Wagging",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "NetsurferBot",
+      "name": "NetsurferBot",
+      "company": "Netsurfer",
+      "category": "feed-reader"
+    },
+    {
       "pattern": "zgrab",
       "name": "zgrab",
       "company": "ZMap Project",
@@ -1276,6 +1708,42 @@
     {
       "pattern": "cve-",
       "name": "CVE probe",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "wp2shell",
+      "name": "wp2shell",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "PageBuilderCK-Scanner",
+      "name": "PageBuilderCK scanner",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "HxC-Endpoint-Discovery",
+      "name": "HxC Endpoint Discovery",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "redirect-scanner",
+      "name": "redirect-scanner",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "/wp-admin/install.php",
+      "name": "WordPress install probe",
+      "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "wildcat-threat-mcp",
+      "name": "wildcat-threat-mcp",
       "company": "unknown",
       "category": "scanner"
     }

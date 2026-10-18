@@ -1,5 +1,4 @@
 import type { IpInfo, SignalEntry, SignalHeuristic } from '../types.js';
-import { CURSOR_PROXY_AGENT } from './sessions.js';
 import { CATEGORY_SPOOFED_BROWSER } from './categories.js';
 
 /** Known agent UA patterns for signal classification. */
@@ -11,6 +10,9 @@ export const DEFAULT_KNOWN_AGENTS: Array<{ pattern: string; name: string; compan
   { pattern: 'Claude-Agent', name: 'Claude Agent', company: 'Anthropic' },
   { pattern: 'Google-Gemini-CLI', name: 'Gemini CLI', company: 'Google' },
   { pattern: 'markdown.new', name: 'markdown.new', company: 'markdown.new' },
+  // OpenCode's webfetch tool since 2026-08-19 (anomalyco/opencode #43330).
+  { pattern: 'OpenCode-User', name: 'OpenCode', company: 'Anomaly' },
+  { pattern: 'Augment-WebFetch', name: 'Augment Code', company: 'Augment Code' },
 ];
 
 /** Known dev tools: stay as programmatic, never promoted to agent. */
@@ -39,7 +41,7 @@ export const SUSPECTED_AGENTS: Record<string, Record<string, string>> = {
  * Matched after whitespace normalization (`, ` → `,`), using startsWith.
  * Order matters: more specific patterns first to avoid short-circuiting.
  *
- * Patterns already caught by specific heuristics (chrome122, cursor, markdownMime)
+ * Patterns already caught by specific heuristics (chrome122, exaFetch, openCode, markdownMime)
  * are excluded because those heuristics run earlier in the chain.
  */
 export interface AcceptPattern {
@@ -47,12 +49,42 @@ export interface AcceptPattern {
   name: string;
 }
 
-/** Cursor's Accept header (markdown first, then a browser-like preference list). */
-export const CURSOR_ACCEPT_PREFIX =
+/**
+ * Accept header of Exa's fetch infrastructure (markdown first, then a
+ * browser-like preference list). Sent by `ExaSearchBot`, by `ExaUser`, and,
+ * until Exa started labelling user-initiated fetches as `ExaUser` in late
+ * September 2026, by Cursor's URL fetch with a generic Chrome UA (controlled
+ * tests 2026-04, 2026-09-19 and 2026-10-18; the last one arrived as ExaUser).
+ */
+export const EXA_FETCH_ACCEPT_PREFIX =
   'text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,application/xml;q=0.7,image/webp;q=0.6,*/*;q=0.5';
 
+/** @deprecated Renamed to EXA_FETCH_ACCEPT_PREFIX; Cursor's fetch runs on Exa and now self-identifies as ExaUser. */
+export const CURSOR_ACCEPT_PREFIX = EXA_FETCH_ACCEPT_PREFIX;
+
+/** Name reported for the Exa fetch fingerprint when the UA does not self-identify. */
+export const EXA_FETCH_NAME = 'Exa fetch (suspected)';
+
+/**
+ * Accept headers hardcoded in OpenCode's webfetch tool
+ * (anomalyco/opencode, packages/core/src/tool/plugin/webfetch.ts), one per
+ * output format: markdown (the default), text, and html. Normalized form
+ * (no space after commas). OpenCode's HTTP client (Effect) also adds
+ * `Traceparent` and `B3` tracing headers to every request.
+ */
+export const OPENCODE_ACCEPT_PREFIXES: string[] = [
+  'text/markdown;q=1.0,text/x-markdown;q=0.9,text/plain;q=0.8,text/html;q=0.7,*/*;q=0.1',
+  'text/plain;q=1.0,text/markdown;q=0.9,text/html;q=0.8,*/*;q=0.1',
+  'text/html;q=1.0,application/xhtml+xml;q=0.9,text/plain;q=0.8,text/markdown;q=0.7,*/*;q=0.1',
+];
+
+/** Identity reported when a request matches OpenCode's fingerprint without its self-identifying UA (builds before 2026-08-19 sent a generic Chrome/143 UA). */
+export const OPENCODE_SUSPECTED = { name: 'OpenCode (suspected)', company: 'Anomaly' } as const;
+
 export const DEFAULT_ACCEPT_TAXONOMY: AcceptPattern[] = [
-  // text/plain preferred over markdown — unusual ordering, distinct framework
+  // text/plain preferred over markdown. OpenCode's text format sends the full
+  // form and is caught by openCodeAcceptHeuristic first; this catches partial
+  // or variant lists with the same unusual ordering.
   { prefix: 'text/plain;q=1.0,text/markdown', name: 'text-first agent' },
   // HTML first, then JSON, markdown, plain text and CSV. Seen from generic Chrome UAs
   // and from self-identifying AI search bots (Keenable, Aranet) in Sept 2026 traffic,
@@ -64,15 +96,14 @@ export const DEFAULT_ACCEPT_TAXONOMY: AcceptPattern[] = [
   },
   // axios-based pattern (same as Claude Code WebFetch, but from non-Claude UAs)
   { prefix: 'text/markdown,text/html,*/*', name: 'axios-pattern agent' },
-  // Full browser-like preference list with markdown first. Cursor's Accept
-  // header, confirmed by controlled tests in April and September 2026. The
-  // cursorFetchHeuristic matches the full Cursor fingerprint; this entry catches
-  // Accept-only matches (e.g. a client whose proxy strips the cache headers).
-  // ExaSearchBot sends the same Accept but self-identifies and is excluded by
-  // the bot database before this runs.
+  // Full browser-like preference list with markdown first: Exa's fetch
+  // infrastructure. The exaFetchHeuristic matches the full fingerprint; this
+  // entry catches Accept-only matches (e.g. a client whose proxy strips the
+  // cache headers). ExaSearchBot and ExaUser send the same Accept but
+  // self-identify and are excluded by the bot database before this runs.
   {
-    prefix: CURSOR_ACCEPT_PREFIX,
-    name: CURSOR_PROXY_AGENT.suspectedName,
+    prefix: EXA_FETCH_ACCEPT_PREFIX,
+    name: EXA_FETCH_NAME,
   },
   // got library: markdown + plain text preference
   { prefix: 'text/markdown,text/plain;q=0.9,*/*;q=0.8', name: 'got-pattern agent' },
@@ -90,71 +121,93 @@ function normalizeAccept(accept: string): string {
 }
 
 /**
- * Sentry Baggage heuristic: definitively identifies Cursor via its Sentry
- * org credentials leaked in the Baggage header. More specific than the
- * Traceparent-based cursorHeuristic, so it runs first in the chain.
+ * Sentry Baggage heuristic: a constant `sentry-public_key` leaked in the
+ * Baggage header of a server-side fetch pipeline, seen in April 2026 alongside
+ * `Traceparent`, `B3` and OpenCode's markdown-first Accept header.
  *
- * The sentry-public_key is constant across all observed Cursor entries
- * and uniquely identifies Cursor's production Sentry deployment.
+ * It was attributed to Cursor at the time. Controlled Cursor tests in
+ * September and October 2026 never produced tracing or Sentry headers, while
+ * OpenCode's source hardcodes that exact Accept string, adds Traceparent and
+ * B3 through its Effect HTTP client, and ships Sentry in its desktop app. The
+ * key itself has not been matched to a project, so the result stays
+ * "suspected".
  */
 export const sentryBaggageHeuristic: SignalHeuristic = (entry: SignalEntry) => {
   const baggage = entry.headers?.['Baggage'] || '';
   if (baggage.includes('sentry-public_key=41fa59a1376ec796312848f4f17266ba')) {
-    return { isAgent: true, name: CURSOR_PROXY_AGENT.name, company: CURSOR_PROXY_AGENT.company };
+    return { isAgent: true, name: OPENCODE_SUSPECTED.name, company: OPENCODE_SUSPECTED.company };
   }
   return null;
 };
 
 /**
- * Cursor fetch heuristic: the full header fingerprint of Cursor's URL fetch,
- * confirmed by a controlled test on 2026-09-19 (fetch initiated from a current
- * Cursor build against a site with no other content-negotiation traffic):
+ * Exa fetch heuristic: the header fingerprint of Exa's fetch infrastructure
+ * when it arrives without a self-identifying UA:
  *
- * - generic Chrome UA (Chrome/145 at the time), no Code/ token
+ * - generic Chrome UA, no Code/ token
  * - Accept: text/markdown,text/html;q=0.9,application/xhtml+xml;q=0.8,...
  * - Pragma: no-cache and Cache-Control: no-cache
  * - no Sec-Ch-Ua (a real Chrome always sends it)
  * - each request from a different proxy IP; no tracing or Sentry headers
  *
- * ExaSearchBot sends the same fingerprint with a self-identifying UA and is
- * excluded by the bot database before this runs.
+ * This was Cursor's URL fetch in controlled tests on 2026-04 and 2026-09-19
+ * (Chrome/145 at the time). On 2026-10-18 the same test produced the same
+ * fingerprint under the `ExaUser/1.0` UA with Web Bot Auth signatures, so Exa
+ * now labels these fetches and the bot database routes them to `ai-assistant`
+ * before this runs. A match here is therefore an Exa-run fetch from a client
+ * that strips or predates the label, and is reported as suspected rather than
+ * attributed to Cursor.
  */
-export const cursorFetchHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+export const exaFetchHeuristic: SignalHeuristic = (entry: SignalEntry) => {
   const h = entry.headers ?? {};
   const ua = h['User-Agent'] || '';
   if (!ua.includes('Chrome/') || ua.includes('Code/')) return null;
   if (h['Sec-Ch-Ua']) return null;
-  if (!normalizeAccept(h['Accept'] || '').startsWith(CURSOR_ACCEPT_PREFIX)) return null;
+  if (!normalizeAccept(h['Accept'] || '').startsWith(EXA_FETCH_ACCEPT_PREFIX)) return null;
   if (h['Pragma'] !== 'no-cache' || h['Cache-Control'] !== 'no-cache') return null;
-  return { isAgent: true, name: CURSOR_PROXY_AGENT.name, company: CURSOR_PROXY_AGENT.company };
+  return { isAgent: true, name: EXA_FETCH_NAME, company: null };
 };
+
+/** @deprecated Renamed to exaFetchHeuristic; the fingerprint belongs to Exa's infrastructure, not to Cursor alone. */
+export const cursorFetchHeuristic: SignalHeuristic = exaFetchHeuristic;
+
+function matchesOpenCodeAccept(accept: string | undefined): boolean {
+  const normalized = normalizeAccept(accept || '');
+  return OPENCODE_ACCEPT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
 
 /**
  * Traced proxy heuristic: generic Chrome UA + Traceparent (OpenTelemetry) header,
  * but NOT VS Code (which includes "Code/" in the UA). Tracing headers mean a
  * server-side fetch pipeline, so this is an agent of some kind.
  *
- * In April 2026 this co-occurred with Cursor's Sentry Baggage header and Accept
- * string. Controlled tests on 2026-09-19 (direct URL fetch and Agent-mode web
- * search, both from a current Cursor build) showed Cursor no longer sends any
- * tracing headers, and the Traceparent traffic seen in September carries a
- * different Accept header (text/markdown;q=1.0, text/x-markdown;q=0.9, ...)
- * plus B3 headers. So: with Cursor's Accept header it is reported as
- * "Cursor (suspected)"; otherwise as a generic traced proxy agent.
+ * Paired with one of OpenCode's Accept headers this is an OpenCode build from
+ * before 2026-08-19, when its webfetch tool sent a generic Chrome/143 UA (the
+ * Traceparent and B3 headers come from its Effect HTTP client). Current builds
+ * self-identify as `OpenCode-User` and never reach this heuristic. Any other
+ * Accept header is reported as a generic traced proxy agent.
  */
 export const tracedProxyHeuristic: SignalHeuristic = (entry: SignalEntry) => {
   const ua = entry.headers?.['User-Agent'] || '';
   if (!entry.headers?.['Traceparent'] || !ua.includes('Chrome/') || ua.includes('Code/')) {
     return null;
   }
-  if (normalizeAccept(entry.headers?.['Accept'] || '').startsWith(CURSOR_ACCEPT_PREFIX)) {
-    return {
-      isAgent: true,
-      name: CURSOR_PROXY_AGENT.suspectedName,
-      company: CURSOR_PROXY_AGENT.company,
-    };
+  if (matchesOpenCodeAccept(entry.headers?.['Accept'])) {
+    return { isAgent: true, name: OPENCODE_SUSPECTED.name, company: OPENCODE_SUSPECTED.company };
   }
   return { isAgent: true, name: 'traced proxy agent', company: null };
+};
+
+/**
+ * OpenCode Accept heuristic: any request whose Accept header is one of the
+ * three preference lists hardcoded in OpenCode's webfetch tool, regardless of
+ * UA or tracing headers. Catches OpenCode builds whose proxy strips tracing
+ * headers, and forks that reuse the fetch tool. Self-identifying `OpenCode-User`
+ * requests are matched by the bot database before this runs.
+ */
+export const openCodeAcceptHeuristic: SignalHeuristic = (entry: SignalEntry) => {
+  if (!matchesOpenCodeAccept(entry.headers?.['Accept'])) return null;
+  return { isAgent: true, name: OPENCODE_SUSPECTED.name, company: OPENCODE_SUSPECTED.company };
 };
 
 /** @deprecated Renamed to tracedProxyHeuristic; kept as an alias. */
@@ -273,7 +326,7 @@ export const markdownMimeHeuristic: SignalHeuristic = (entry: SignalEntry) => {
  * agent frameworks. Each framework produces a distinctive preference ordering
  * and q-value pattern that is more stable than UA strings.
  *
- * Runs after more specific heuristics (chrome122, cursor, markdownMime) so it
+ * Runs after more specific heuristics (chrome122, exaFetch, openCode, markdownMime) so it
  * only catches entries those missed. Provides more specific naming than the
  * trigger-based "unidentified" fallback.
  */
@@ -341,8 +394,9 @@ export const DEFAULT_HEURISTICS: SignalHeuristic[] = [
   spoofedBrowserHeuristic,
   chrome122Heuristic,
   sentryBaggageHeuristic,
-  cursorFetchHeuristic,
+  exaFetchHeuristic,
   tracedProxyHeuristic,
+  openCodeAcceptHeuristic,
   conversationTrackingHeuristic,
   markdownMimeHeuristic,
   acceptTaxonomyHeuristic,

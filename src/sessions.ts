@@ -15,7 +15,7 @@ import type {
 import {
   DEFAULT_WINDOW_SECONDS,
   DEFAULT_PROXY_WINDOW_SECONDS,
-  CURSOR_PROXY_AGENT,
+  DEFAULT_PROXY_AGENT,
 } from './defaults/sessions.js';
 import {
   CATEGORY_AGENT,
@@ -215,7 +215,7 @@ export function detectDuplicateRequestAgents(
   options?: SessionOptions,
 ): ClassifiedEntry[] {
   const proxyWindowSeconds = options?.proxyWindowSeconds ?? DEFAULT_PROXY_WINDOW_SECONDS;
-  const proxyAgent = options?.proxyAgent ?? CURSOR_PROXY_AGENT;
+  const proxyAgent = options?.proxyAgent ?? DEFAULT_PROXY_AGENT;
   const proxyBotNames = new Set([UNIDENTIFIED_AGENT, proxyAgent.name, proxyAgent.suspectedName]);
   const sessionProfiles = options?.sessionProfiles;
 

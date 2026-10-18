@@ -109,7 +109,7 @@ export interface SignalClassifierOptions {
 /** Configuration for the proxy-based agent detected by duplicate-request heuristic. */
 export interface ProxyAgentConfig {
   name: string;
-  company: string;
+  company: string | null;
   suspectedName: string;
 }
 
