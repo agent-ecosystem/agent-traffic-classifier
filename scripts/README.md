@@ -31,9 +31,10 @@ Keep the directory out of the repo. It is raw traffic data.
 npm run build
 node scripts/audit-access-logs.mjs <log-dir>
 node scripts/audit-signal-logs.mjs <log-dir>
+node scripts/audit-sessions.mjs <log-dir> [--dev-tools afdocs/] [--watch 1.2.3.4]
 ```
 
-Both print to stdout; redirect to a file for anything more than a day of logs.
+All three print to stdout; redirect to a file for anything more than a day of logs.
 
 ## Read the access-log report
 
@@ -55,6 +56,15 @@ Then one section per classifier result, each listing distinct User-Agent and Acc
 - **unidentified** entries hit an agent trigger but matched no heuristic. A repeated UA/Accept combination here is a new fingerprint. If the UA self-identifies, it belongs in `bots.json`; if it is a generic browser UA, the Accept header and extra headers are what to encode in `src/defaults/agents.ts`.
 - **NOT-AGENT** is worth a skim for self-identifying agents the bot database does not know, since those fall through when their request did not carry an agent trigger.
 - Named sections show what each heuristic is catching. Check that a heuristic's section does not contain a self-identifying crawler; if it does, the crawler needs a `bots.json` entry so the bot database excludes it before the heuristics run.
+
+## Read the session report
+
+`audit-sessions.mjs` runs the whole pipeline a consumer runs (signal seeds, `detectSpoofedBrowsers`, `detectScanners`, duplicate-request and IP cross-reference attribution) and reports what each stage moved. Run it before and after a detector change to see the effect on a week of traffic; the `--dev-tools` flag should list the same user-agent substrings your pipeline passes to `createSignalClassifier`, or your own tooling will seed "unidentified" agent sessions and inflate the agent column.
+
+- **filtered requests by category after each stage** is the headline: how much left `human` at each pass.
+- **surviving human pairs** are the gaps. A browser UA with fifteen or more page requests from one address and no asset load is a crawler none of the detectors reached; the paths and referrers show why (a current browser version, same-site referrers on every request, no probes).
+- **surviving human UA pools** is the proxy-pool view: one UA string used by many addresses, one request each, no asset load. Groups still here after the `uaPools` trigger are usually sites with too few addresses per UA to reach `poolMinIps`.
+- **top external referrers** should contain search engines and real inbound links. A host with page requests roughly equal to distinct addresses and no asset loads is a fake-referrer crawler; look it up in the pools section.
 
 ## Confirming an attribution
 
