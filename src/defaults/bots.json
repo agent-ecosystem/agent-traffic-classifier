@@ -844,7 +844,7 @@
     {
       "pattern": "coccocbot",
       "name": "CocCocBot",
-      "company": "C\u1ed1c C\u1ed1c",
+      "company": "Cốc Cốc",
       "category": "search-crawler"
     },
     {
@@ -1757,6 +1757,84 @@
       "pattern": "wildcat-threat-mcp",
       "name": "wildcat-threat-mcp",
       "company": "unknown",
+      "category": "scanner"
+    },
+    {
+      "pattern": "AgenstryBot",
+      "name": "Agenstry",
+      "company": "Agenstry",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "agentcensus-crawler",
+      "name": "agentcensus",
+      "company": "agentcensus",
+      "category": "ai-search"
+    },
+    {
+      "pattern": "AnySearchUser",
+      "name": "AnySearchUser",
+      "company": "AnySearch",
+      "category": "ai-assistant"
+    },
+    {
+      "pattern": "RiverBot",
+      "name": "RiverBot",
+      "company": "River AI",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "KosoBot",
+      "name": "KosoBot",
+      "company": "Koso",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "CorpusBot",
+      "name": "CorpusBot",
+      "company": "corpus.blog",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "ev-crawler",
+      "name": "Headline crawler",
+      "company": "Headline",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "TechLeadsBot",
+      "name": "TechLeadsBot",
+      "company": "TechLeads",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "T2Bot",
+      "name": "T2Bot",
+      "company": "T2 Industries",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "AskRobotsBot",
+      "name": "AskRobotsBot",
+      "company": "AskRobots",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "IBEROBot",
+      "name": "IBEROBot",
+      "company": "IBERO",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "ForestEngine",
+      "name": "ForestEngine",
+      "company": "ForestEngine",
+      "category": "scanner"
+    },
+    {
+      "pattern": "InternetData.io",
+      "name": "InternetData.io",
+      "company": "InternetData",
       "category": "scanner"
     }
   ]

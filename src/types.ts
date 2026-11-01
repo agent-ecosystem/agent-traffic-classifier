@@ -172,6 +172,28 @@ export interface SpoofedBrowserOptions {
    * version. Default true.
    */
   robotsFetchers?: boolean;
+  /**
+   * Relax the request-count minimum for a user-agent string that is spread one
+   * request per IP across a proxy pool: when a stale browser UA appears from at
+   * least `poolMinIps` addresses, nearly all single-request, with no asset load
+   * from any of them and a Referer on at least `poolReferrerShare` of its
+   * requests, every pair wearing that UA is demoted. Default true.
+   */
+  uaPools?: boolean;
+  /** Distinct IPs a stale UA string needs before the pool test applies. Default 5. */
+  poolMinIps?: number;
+  /** Share of a pool UA's requests that must carry a Referer. Default 0.8. */
+  poolReferrerShare?: number;
+  /**
+   * Also demote any browser-UA pair that fetched a stylesheet, script, or font
+   * with an off-site referrer. A browser sends the embedding page as the
+   * referrer of its sub-resources, never the site the visitor came from, so
+   * this is only produced by automation replaying a fixed fake referrer. The
+   * giveaway proves that referrer value fake for that UA string, so every pair
+   * wearing the same UA that sent the same exact referrer URL is demoted too.
+   * Default true.
+   */
+  externalAssetReferrers?: boolean;
 }
 
 /** Options for detectScanners. */

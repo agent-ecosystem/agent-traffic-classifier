@@ -91,6 +91,12 @@ export const DEFAULT_PROBE_PATTERNS: RegExp[] = [
   /union(?:\+|%20| )+(?:all(?:\+|%20| )+)?select|sleep\(\d+\)|benchmark\(|information_schema/i,
   /<script|%3cscript/i,
   /xdebug_session_start/i,
+  // Exposed LLM proxies (OpenAI-compatible routes, Ollama) and API schema discovery.
+  // Path matches count only on 4xx, so a site that really serves an API never trips these.
+  /\/v\d+\/(?:chat\/completions|completions|models|embeddings|messages)(?:$|\/|\?)/i,
+  /\/api\/(?:openai|generate|tags|keys|env|config|secrets)(?:$|\/|\?)/i,
+  /(?:^|\/)(?:openapi|swagger)\.(?:json|ya?ml)(?:$|\?)/i,
+  /\/(?:swagger-ui|api-docs|v\d+\/api-docs)(?:$|\/|\?)/i,
   // Backups and editor droppings
   /\.(?:bak|old|orig|swp)(?:$|\?)/i,
   /(?:^|\/)(?:backup|bak|www|site|html|public_html|htdocs|wwwroot|db|database|dump)[\w.-]*\.(?:zip|tar|tgz|gz|rar|7z)(?:$|\?)/i,

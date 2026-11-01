@@ -518,6 +518,32 @@ describe('createClassifier', () => {
       expect(classify('-').category).toBe('unknown');
     });
 
+    it('classifies a browser UA truncated before the browser token as unknown', () => {
+      for (const ua of [
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)',
+        'Mozilla/5.0 (Macintosh) Safari/605',
+        'Mozilla/5.0 Safari/605.1.15',
+        'Mozilla/5.0 Chrome/131.0',
+      ]) {
+        expect(classify(ua).category, ua).toBe('unknown');
+      }
+    });
+
+    it('keeps a full browser UA human and a curated bot in a truncated frame curated', () => {
+      expect(
+        classify(
+          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ).category,
+      ).toBe('human');
+      expect(
+        classify(
+          'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) AppleWebKit/537.36',
+        ).botName,
+      ).toBe('Googlebot');
+    });
+
     it('respects bot list priority (Applebot-Extended before Applebot)', () => {
       const extResult = classify('Applebot-Extended/1.0');
       expect(extResult.category).toBe('ai-crawler');
@@ -566,5 +592,57 @@ describe('defaultBotDb', () => {
 
   it('does not contain the internal-tool category', () => {
     expect(defaultBotDb.categories).not.toHaveProperty('internal-tool');
+  });
+});
+
+describe('patterns added from November 2026 traffic', () => {
+  const classify = createClassifier();
+  it('classifies agent-directory indexers as ai-search', () => {
+    expect(classify('AgenstryBot/0.3.0 (+https://agenstry.com/bot)')).toEqual({
+      category: 'ai-search',
+      botName: 'Agenstry',
+      botCompany: 'Agenstry',
+    });
+    expect(classify('agentcensus-crawler/1.0 (+https://agentcensus.dev/crawler)').category).toBe(
+      'ai-search',
+    );
+  });
+  it('classifies AnySearchUser as ai-assistant and RiverBot and KosoBot as ai-crawler', () => {
+    expect(
+      classify('Mozilla/5.0 (compatible; AnySearchUser/1.0; +https://bot.anysearch.com/)').category,
+    ).toBe('ai-assistant');
+    expect(classify('RiverBot/1.0 (+https://river.ai/bot)').category).toBe('ai-crawler');
+    expect(classify('KosoBot/1.0 (+https://koso.ai/bot)').category).toBe('ai-crawler');
+  });
+  it('classifies ForestEngine (browser-framed) and InternetData.io as scanner', () => {
+    expect(
+      classify(
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 ForestEngine/1.0 (+https://forestengine.net/#opt-out)',
+      ).category,
+    ).toBe('scanner');
+    expect(
+      classify('Mozilla/5.0 (compatible; InternetData.io/1.0; +https://internetdata.io/scan)')
+        .category,
+    ).toBe('scanner');
+  });
+  it('classifies the search and SEO crawlers from the audit', () => {
+    expect(classify('Mozilla/5.0 (compatible; T2Bot/1.0; +https://t2ind.com/bot)').category).toBe(
+      'search-crawler',
+    );
+    expect(classify('AskRobotsBot/1.0 (+https://askrobots.com/bot)').category).toBe(
+      'search-crawler',
+    );
+    expect(
+      classify('IBEROBot/1.0 (+https://ibero.io/bot) (variant; SupabaseEdgeRuntime/1.77.8)')
+        .category,
+    ).toBe('search-crawler');
+    expect(classify('CorpusBot/1.0 (+https://corpus.blog/crawler)').category).toBe('seo-bot');
+    expect(
+      classify('Mozilla/5.0 (compatible; ev-crawler/1.0; +https://headline.com/web-crawler)')
+        .botCompany,
+    ).toBe('Headline');
+    expect(
+      classify('Mozilla/5.0 (compatible; TechLeadsBot/1.0; +https://techleads.fyi/bot)').category,
+    ).toBe('seo-bot');
   });
 });

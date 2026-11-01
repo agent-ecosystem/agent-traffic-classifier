@@ -573,3 +573,47 @@ describe('detectScanners + aggregate', () => {
     expect(DEFAULT_PROBE_PATTERNS.every((re) => re instanceof RegExp)).toBe(true);
   });
 });
+
+describe('LLM-proxy and API-discovery probes (November 2026)', () => {
+  it('matches exposed-LLM and schema-discovery paths', () => {
+    for (const p of [
+      '/v1/chat/completions',
+      '/api/v1/chat/completions',
+      '/v1/models',
+      '/api/v1/completions',
+      '/v1/embeddings',
+      '/api/openai',
+      '/api/tags',
+      '/api/keys',
+      '/api/env',
+      '/openapi.json',
+      '/openapi.yaml',
+      '/swagger.json',
+      '/swagger-ui',
+      '/api-docs',
+      '/v3/api-docs',
+      '/v2/api-docs',
+    ]) {
+      expect(isProbePath(p), p).toBe(true);
+    }
+  });
+  it('does not match ordinary docs paths that mention versions or APIs', () => {
+    for (const p of [
+      '/docs/v1/',
+      '/reference/api/',
+      '/api/',
+      '/v1/',
+      '/blog/openapi-tips/',
+      '/tags/openai/',
+    ]) {
+      expect(isProbePath(p), p).toBe(false);
+    }
+  });
+  it('counts a schema path only when the server answered 4xx', () => {
+    expect(isProbeRequest({ path: '/openapi.json', status: 404, method: 'GET' })).toBe(true);
+    expect(isProbeRequest({ path: '/openapi.json', status: 200, method: 'GET' })).toBe(false);
+    expect(isProbeRequest({ path: '/v1/chat/completions', status: 404, method: 'POST' })).toBe(
+      true,
+    );
+  });
+});

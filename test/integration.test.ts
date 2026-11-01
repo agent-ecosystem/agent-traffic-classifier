@@ -21,7 +21,7 @@ describe('integration: full pipeline', () => {
 
     // Simulate access log lines
     const lines = [
-      '1.1.1.1 - - [04/Apr/2026:10:00:00 -0700] "GET /about/ HTTP/1.1" 200 5000 "https://google.com" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0"',
+      '1.1.1.1 - - [04/Apr/2026:10:00:00 -0700] "GET /about/ HTTP/1.1" 200 5000 "https://google.com" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"',
       '2.2.2.2 - - [04/Apr/2026:10:00:01 -0700] "GET /about/ HTTP/1.1" 200 5000 "-" "GPTBot/1.0"',
       '3.3.3.3 - - [04/Apr/2026:10:00:02 -0700] "GET /style.css HTTP/1.1" 200 1000 "-" "Mozilla/5.0"',
       '4.4.4.4 - - [04/Apr/2026:10:00:03 -0700] "GET / HTTP/1.1" 200 3000 "-" "curl/7.68.0"',
@@ -98,7 +98,7 @@ describe('integration: full pipeline', () => {
     const shouldSkip = createFilter();
 
     const lines = [
-      '1.1.1.1 - - [04/Apr/2026:10:00:00 -0700] "GET / HTTP/1.1" 200 5000 "-" "Mozilla/5.0 Chrome/120.0.0.0"',
+      '1.1.1.1 - - [04/Apr/2026:10:00:00 -0700] "GET / HTTP/1.1" 200 5000 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"',
       '2.2.2.2 - - [04/Apr/2026:10:00:01 -0700] "GET / HTTP/1.1" 200 5000 "-" "ClaudeBot/1.0"',
     ];
 

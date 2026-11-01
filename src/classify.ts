@@ -16,6 +16,21 @@ import {
  */
 const BARE_MOZILLA_RE = /^Mozilla\/[45]\.0(?:\s*\(compatible;?\s*\))?\s*$/;
 
+/**
+ * A browser user agent cut off before the browser token, such as
+ * `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36` or
+ * `Mozilla/5.0 (Macintosh) Safari/605`. No browser sends these; in November
+ * 2026 logs they came from 31 addresses probing `.env`, `/api/keys`,
+ * `/actuator/env`, `/openapi.json`, and `/swagger.json`. Like a bare
+ * `Mozilla/5.0` they are `unknown`, which keeps them eligible for
+ * behavioural detection (isbot passes them, so they would otherwise be
+ * `human`, and with no version there is nothing for the stale-browser test
+ * to compare). Checked after the curated bot list so a self-identifying
+ * `(compatible; SomeBot/1.0) AppleWebKit/537.36` keeps its entry.
+ */
+const TRUNCATED_BROWSER_RE =
+  /^Mozilla\/5\.0 (?:\((?![^)]*compatible)[^)]*\) )?(?:AppleWebKit\/[\d.]+(?: \(KHTML, like Gecko\))?|(?:Chrome|Safari)\/[\d.]+)\s*$/;
+
 /** The default bot database shipped with the library. */
 export const defaultBotDb = defaultBotDatabase as {
   categories: Record<string, string>;
@@ -52,6 +67,10 @@ export function createClassifier(
           botCompany: bot.company,
         };
       }
+    }
+
+    if (TRUNCATED_BROWSER_RE.test(userAgent)) {
+      return { category: CATEGORY_UNKNOWN, botName: null, botCompany: null };
     }
 
     // 2. Heuristic: programmatic clients that aren't in bot lists.

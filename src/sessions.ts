@@ -56,6 +56,10 @@ export function isSameSiteReferrer(referrer: string | null | undefined, domain: 
 
 /** Extensions that indicate static asset requests (images, scripts, styles, fonts). */
 const STATIC_ASSET_RE = /\.(css|js|mjs|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot)(\?|$)/i;
+/** Sub-resources a browser only ever fetches while rendering one of the site's own pages. */
+const SUBRESOURCE_RE = /\.(css|js|mjs|woff2?|ttf|eot)(\?|$)/i;
+/** Share of a UA string's IPs that must be single-request for the pool test. */
+const POOL_SINGLE_SHARE = 0.9;
 /** The crawl-policy file. No browser requests it on its own; see detectSpoofedBrowsers. */
 export const ROBOTS_TXT_RE = /^\/robots\.txt(\?|$)/i;
 
@@ -536,10 +540,48 @@ export function parseBrowserVersion(
  * dozens of IPs. 355 of 374 such pairs had no asset load; the 19 that did were
  * real sessions in which someone also opened robots.txt.
  *
+ * A third trigger (`uaPools`, default on) relaxes the request-count minimum
+ * for a UA string that a proxy pool spreads one request per address. In
+ * November 2026 logs, 23 frozen early-2024 browser strings made 2,542 page
+ * requests from 2,537 residential IPs, one each, with no asset load and a
+ * Referer on 99.6% of them pointing at a page that links to the target. Agent
+ * fetchers share the one-request-per-IP shape (ExaUser, ChatGPT-User, Claude
+ * Code all do) but not the rest: their UAs track a current runtime, and they
+ * are handed URLs rather than following links, so they send no Referer
+ * (0 of 568 agent requests that week; 11% for ChatGPT-User). A UA is a pool
+ * UA when it parses as a browser, is stale by the same threshold as the pair
+ * test, appears from at least `poolMinIps` addresses of which 90% or more are
+ * single-request, never loaded an asset from any of them, and carried a
+ * Referer on at least `poolReferrerShare` of its requests. Every pair wearing
+ * it is then demoted, same-site referrers included (the pool reports them).
+ * The detector runs per site, and a pool spread over many small sites leaves
+ * only a few addresses per UA on each, so the default `poolMinIps` is 5: five
+ * independent addresses on one stale string with no asset load from any of
+ * them is stronger evidence than the two requests the pair test accepts from
+ * one address. In the audit week a threshold of 20 reached 37% of the pool's
+ * requests, 10 reached 71%, 5 reached 83%, and every group down to 3 addresses
+ * was visibly the same crawler.
+ *
+ * A fourth trigger (`externalAssetReferrers`, default on): a browser-UA pair
+ * that fetched a stylesheet, script, or font with an off-site referrer. A
+ * browser's sub-resource requests carry the embedding page as referrer, never
+ * the site the visitor arrived from, so this only comes from automation that
+ * renders pages (it does load assets) while replaying one fixed fake referrer
+ * on every request. Images are excluded because hotlinking produces exactly
+ * that shape legitimately. The giveaway proves the referrer value fake for
+ * that UA string, so every pair on the site wearing the same UA that sent the
+ * same exact referrer URL is demoted with it: in November 2026 one Chrome/146
+ * string replayed `https://www.aocr.org/` from 193 addresses, 9 of which
+ * rendered pages and gave it away while the rest fetched one page and one
+ * image each. No legitimate (UA, referrer) group in that week contained a
+ * giveaway pair, including the google.com groups.
+ *
  * Shared-IP safety: the key is IP+UA, not IP; single-request pairs are never
- * touched by the version test (a returning visitor with cached assets looks the
- * same as a single hit); and the version test keeps carrier-grade NAT safe,
- * since current browser versions can never be demoted by it.
+ * touched by the version test alone (a returning visitor with cached assets
+ * looks the same as a single hit); the pool test needs the same UA string to
+ * recur across many addresses with no asset load from any of them; and the
+ * version tests keep carrier-grade NAT safe, since current browser versions
+ * can never be demoted by them.
  */
 export function detectSpoofedBrowsers(
   classifiedEntries: ClassifiedEntry[],
@@ -549,32 +591,67 @@ export function detectSpoofedBrowsers(
   const minRequests = options?.minRequests ?? 2;
   const staleMajors = { ...DEFAULT_STALE_MAJORS, ...options?.staleMajors };
   const robotsFetchers = options?.robotsFetchers ?? true;
+  const uaPools = options?.uaPools ?? true;
+  const poolMinIps = options?.poolMinIps ?? 5;
+  const poolReferrerShare = options?.poolReferrerShare ?? 0.8;
+  const externalAssetReferrers = options?.externalAssetReferrers ?? true;
 
   type Pair = {
+    ua: string;
     n: number;
     assets: boolean;
     selfRef: boolean;
     robots: boolean;
+    /** Exact off-site referrer URLs this pair sent on a stylesheet, script, or font request. */
+    fakeRefs: Set<string>;
+    /** Exact off-site referrer URLs this pair sent on any request. */
+    offsiteRefs: Set<string>;
     parsed: ReturnType<typeof parseBrowserVersion>;
   };
   const pairs = new Map<string, Pair>();
+  /** Per UA string: requests, requests with any referrer, and whether any pair loaded an asset. */
+  type Pool = { n: number; referred: number; assets: boolean; keys: string[] };
+  const pools = new Map<string, Pool>();
   for (const { entry } of classifiedEntries) {
     const key = `${entry.ip}|||${entry.userAgent}`;
     let p = pairs.get(key);
     if (!p) {
       p = {
+        ua: entry.userAgent,
         n: 0,
         assets: false,
         selfRef: false,
         robots: false,
+        fakeRefs: new Set(),
+        offsiteRefs: new Set(),
         parsed: parseBrowserVersion(entry.userAgent),
       };
       pairs.set(key, p);
+      if (p.parsed) {
+        let pool = pools.get(entry.userAgent);
+        if (!pool) {
+          pool = { n: 0, referred: 0, assets: false, keys: [] };
+          pools.set(entry.userAgent, pool);
+        }
+        pool.keys.push(key);
+      }
     }
     p.n++;
-    if (STATIC_ASSET_RE.test(entry.path)) p.assets = true;
-    if (isSameSiteReferrer(entry.referrer, domain)) p.selfRef = true;
+    const isAsset = STATIC_ASSET_RE.test(entry.path);
+    if (isAsset) p.assets = true;
+    const selfRef = isSameSiteReferrer(entry.referrer, domain);
+    if (selfRef) p.selfRef = true;
     if (ROBOTS_TXT_RE.test(entry.path)) p.robots = true;
+    if (entry.referrer && !selfRef && p.parsed) {
+      p.offsiteRefs.add(entry.referrer);
+      if (SUBRESOURCE_RE.test(entry.path)) p.fakeRefs.add(entry.referrer);
+    }
+    const pool = p.parsed ? pools.get(entry.userAgent) : undefined;
+    if (pool) {
+      pool.n++;
+      if (entry.referrer) pool.referred++;
+      if (isAsset) pool.assets = true;
+    }
   }
 
   // Reference: newest major per family among pairs that behave like browsers.
@@ -587,17 +664,58 @@ export function detectSpoofedBrowsers(
     }
   }
 
+  const isStale = (parsed: NonNullable<Pair['parsed']>): boolean => {
+    const ref = reference[parsed.family];
+    return ref !== undefined && parsed.major <= ref - staleMajors[parsed.family];
+  };
+
+  // Referrer URLs proven fake by a sub-resource fetch, per UA string. Any pair
+  // wearing the same UA that sent the same exact referrer is the same automation.
+  const provenFake = new Map<string, Set<string>>();
+  if (externalAssetReferrers) {
+    for (const p of pairs.values()) {
+      if (p.fakeRefs.size === 0) continue;
+      let set = provenFake.get(p.ua);
+      if (!set) {
+        set = new Set();
+        provenFake.set(p.ua, set);
+      }
+      for (const r of p.fakeRefs) set.add(r);
+    }
+  }
+  const sentProvenFake = (p: Pair): boolean => {
+    const set = provenFake.get(p.ua);
+    if (!set) return false;
+    for (const r of p.offsiteRefs) if (set.has(r)) return true;
+    return false;
+  };
+
   const demote = new Set<string>();
   for (const [key, p] of pairs) {
-    if (!p.parsed || p.assets) continue;
+    if (!p.parsed) continue;
+    if (externalAssetReferrers && (p.fakeRefs.size > 0 || sentProvenFake(p))) {
+      demote.add(key);
+      continue;
+    }
+    if (p.assets) continue;
     if (robotsFetchers && p.robots) {
       demote.add(key);
       continue;
     }
     if (p.n < minRequests || p.selfRef) continue;
-    const ref = reference[p.parsed.family];
-    if (ref === undefined) continue;
-    if (p.parsed.major <= ref - staleMajors[p.parsed.family]) demote.add(key);
+    if (isStale(p.parsed)) demote.add(key);
+  }
+
+  if (uaPools) {
+    for (const [ua, pool] of pools) {
+      if (pool.assets || pool.keys.length < poolMinIps) continue;
+      if (pool.referred < poolReferrerShare * pool.n) continue;
+      const single = pool.keys.filter((k) => pairs.get(k)!.n < minRequests).length;
+      if (single < POOL_SINGLE_SHARE * pool.keys.length) continue;
+      const parsed = parseBrowserVersion(ua);
+      if (!parsed || !isStale(parsed)) continue;
+      for (const k of pool.keys) demote.add(k);
+    }
   }
   if (demote.size === 0) return classifiedEntries;
 

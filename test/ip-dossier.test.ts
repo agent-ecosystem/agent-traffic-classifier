@@ -463,4 +463,168 @@ describe('detectSpoofedBrowsers', () => {
     const out = detectSpoofedBrowsers(classified([...realChrome, ...bot]), 'example.com');
     expect(out[2].classification.category).toBe('ai-crawler');
   });
+
+  describe('uaPools (November 2026 residential-proxy crawler)', () => {
+    const OFFSITE = 'https://corpus.blog/posts/abc';
+    const poolOf = (ua: string, count: number, referrer: string | null = OFFSITE) =>
+      Array.from({ length: count }, (_, i) =>
+        log({
+          ip: `10.0.${Math.floor(i / 250)}.${(i % 250) + 1}`,
+          userAgent: ua,
+          path: `/p${i}/`,
+          referrer,
+        }),
+      );
+    it('demotes a stale UA spread one request per IP with referrers and no assets', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 20)]),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+      expect(out.slice(0, 2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('demotes the pool even when its referrers are same-site pages', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 20, 'https://example.com/other/')]),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+    });
+    it('keeps a stale UA pool that sends no referrers (agent-shaped fetches)', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 20, null)]),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('keeps a current-version UA pool (ExaUser-shaped proxy fetches)', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_NEW, 20)]),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('keeps a pool below poolMinIps', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 4)]),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('keeps a pool when any address wearing the UA loaded an asset', () => {
+      const entries = [
+        ...realChrome,
+        ...poolOf(CHROME_OLD, 20),
+        log({
+          ip: '10.9.9.9',
+          userAgent: CHROME_OLD,
+          path: '/css/site.css',
+          referrer: 'https://example.com/',
+        }),
+      ];
+      const out = detectSpoofedBrowsers(classified(entries), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('can be disabled with uaPools: false', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 20)]),
+        'example.com',
+        {
+          uaPools: false,
+        },
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+  });
+
+  describe('externalAssetReferrers (fixed fake referrer on sub-resources)', () => {
+    const FAKE = 'https://www.aocr.org/';
+    it('demotes a pair that fetched a stylesheet with an off-site referrer, assets and version notwithstanding', () => {
+      const headless = [
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/', referrer: FAKE }),
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/css/site.css', referrer: FAKE }),
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/app.js', referrer: FAKE }),
+      ];
+      const out = detectSpoofedBrowsers(classified([...realChrome, ...headless]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+      expect(out.slice(0, 2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('extends the giveaway to every pair with the same UA and the same exact referrer', () => {
+      const giveaway = [
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/', referrer: FAKE }),
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/css/site.css', referrer: FAKE }),
+      ];
+      const sameUaSameRef = log({
+        ip: '8.8.8.8',
+        userAgent: CHROME_NEW,
+        path: '/about/',
+        referrer: FAKE,
+      });
+      const sameUaOtherRef = log({
+        ip: '7.7.7.7',
+        userAgent: CHROME_NEW,
+        path: '/about/',
+        referrer: 'https://news.example/post',
+      });
+      const otherUaSameRef = log({
+        ip: '6.6.6.6',
+        userAgent: SAFARI_NEW,
+        path: '/about/',
+        referrer: FAKE,
+      });
+      const out = detectSpoofedBrowsers(
+        classified([
+          ...realChrome,
+          ...realSafari,
+          ...giveaway,
+          sameUaSameRef,
+          sameUaOtherRef,
+          otherUaSameRef,
+        ]),
+        'example.com',
+      );
+      const cats = out.slice(4).map((e) => e.classification.category);
+      expect(cats).toEqual([
+        'spoofed-browser',
+        'spoofed-browser',
+        'spoofed-browser',
+        'human',
+        'human',
+      ]);
+    });
+    it('keeps a hotlinked image (off-site referrer on an image only)', () => {
+      const out = detectSpoofedBrowsers(
+        classified([
+          ...realChrome,
+          log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/images/a.png', referrer: FAKE }),
+        ]),
+        'example.com',
+      );
+      expect(out[2].classification.category).toBe('human');
+    });
+    it('keeps a real session whose sub-resources carry the embedding page as referrer', () => {
+      const real = [
+        log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/', referrer: FAKE }),
+        log({
+          ip: '9.9.9.9',
+          userAgent: CHROME_NEW,
+          path: '/css/site.css',
+          referrer: 'https://example.com/',
+        }),
+      ];
+      const out = detectSpoofedBrowsers(classified([...realChrome, ...real]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('can be disabled with externalAssetReferrers: false', () => {
+      const out = detectSpoofedBrowsers(
+        classified([
+          ...realChrome,
+          log({ ip: '9.9.9.9', userAgent: CHROME_NEW, path: '/css/site.css', referrer: FAKE }),
+        ]),
+        'example.com',
+        { externalAssetReferrers: false },
+      );
+      expect(out[2].classification.category).toBe('human');
+    });
+  });
 });
