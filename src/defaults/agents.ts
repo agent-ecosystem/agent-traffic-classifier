@@ -221,9 +221,17 @@ export const cursorHeuristic: SignalHeuristic = tracedProxyHeuristic;
 export const SPOOFED_BROWSER_NAME = 'browser-spoofing crawler';
 
 /**
- * Spoofed browser heuristic: the request carries browser client hints that a
- * real browser could not have produced alongside its own user agent.
+ * Spoofed browser heuristic: the request carries browser headers that a real
+ * browser could not have produced alongside its own user agent.
  *
+ * - Browsers send the Fetch Metadata headers `Sec-Fetch-Site`, `Sec-Fetch-Mode`
+ *   and `Sec-Fetch-Dest` together on every request (Chrome 76+, Firefox 90+,
+ *   Safari 16.4+); a browser UA with `Sec-Fetch-Site` but not the other two is
+ *   a fetch library copying a subset. In November 2026 this was the exact
+ *   header set of a proxy-pool crawler (147 requests from 144 addresses, one
+ *   each, Chrome/131, `Content-Length: 0` on GET, no `Accept-Language`) that
+ *   fetched the markdown alternate of HTML pages and otherwise matched the
+ *   "html-first agent" Accept pattern.
  * - Firefox and Safari never send `Sec-Ch-Ua`; a Gecko or WebKit UA with client
  *   hints is a fetch library wearing a costume.
  * - Chrome and Edge report their own major version in `Sec-Ch-Ua`; a UA whose
@@ -240,8 +248,19 @@ export const SPOOFED_BROWSER_NAME = 'browser-spoofing crawler';
 export const spoofedBrowserHeuristic: SignalHeuristic = (entry: SignalEntry) => {
   const h = entry.headers ?? {};
   const ua = h['User-Agent'] || '';
+  if (!ua.startsWith('Mozilla/5.0 (')) return null;
+
+  if (h['Sec-Fetch-Site'] && (!h['Sec-Fetch-Mode'] || !h['Sec-Fetch-Dest'])) {
+    return {
+      isAgent: false,
+      category: CATEGORY_SPOOFED_BROWSER,
+      name: SPOOFED_BROWSER_NAME,
+      company: null,
+    };
+  }
+
   const hints = h['Sec-Ch-Ua'];
-  if (!hints || !ua.startsWith('Mozilla/5.0 (')) return null;
+  if (!hints) return null;
 
   const isGecko = /Gecko\/\d+/.test(ua) && /Firefox\//.test(ua);
   const isSafari = /Version\/[\d.]+.*Safari\//.test(ua) && !/Chrome\/|Chromium\/|CriOS\//.test(ua);

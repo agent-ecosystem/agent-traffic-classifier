@@ -58,6 +58,36 @@ const classified = (entries: LogEntry[]): ClassifiedEntry[] =>
   entries.map((entry) => ({ entry, classification: classify(entry.userAgent) }));
 
 describe('spoofedBrowserHeuristic', () => {
+  it('flags a browser UA that sends Sec-Fetch-Site without Sec-Fetch-Mode and Sec-Fetch-Dest', () => {
+    const r = spoofedBrowserHeuristic(
+      sig({
+        ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,text/markdown;q=0.7,text/plain;q=0.6,text/csv;q=0.6,*/*;q=0.5',
+        extra: { 'Sec-Fetch-Site': 'cross-site', 'Content-Length': '0', Connection: 'close' },
+      }),
+    );
+    expect(r).toEqual({
+      isAgent: false,
+      category: 'spoofed-browser',
+      name: SPOOFED_BROWSER_NAME,
+      company: null,
+    });
+  });
+  it('does not flag a full Fetch Metadata set without client hints (Firefox, Safari)', () => {
+    const full = {
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Dest': 'document',
+    };
+    expect(spoofedBrowserHeuristic(sig({ ua: FIREFOX, extra: full }))).toBeNull();
+    expect(spoofedBrowserHeuristic(sig({ ua: SAFARI_NEW, extra: full }))).toBeNull();
+  });
+  it('does not flag a non-browser UA that sends partial Fetch Metadata', () => {
+    expect(
+      spoofedBrowserHeuristic(sig({ ua: CLAUDE_CODE, extra: { 'Sec-Fetch-Site': 'none' } })),
+    ).toBeNull();
+  });
   it('flags a Firefox UA carrying Chromium client hints', () => {
     const r = spoofedBrowserHeuristic(
       sig({ ua: FIREFOX, extra: { 'Sec-Ch-Ua': '"Chromium";v="99", "Google Chrome";v="99"' } }),
@@ -417,7 +447,7 @@ describe('detectSpoofedBrowsers', () => {
     const out = detectSpoofedBrowsers(classified([...realChrome, ...withRef]), 'example.com');
     expect(out.every((e) => e.classification.category === 'human')).toBe(true);
   });
-  it('uses per-family references and skips families with no reference', () => {
+  it('uses per-family references and, without the floor, skips families with no reference', () => {
     const oldSafari = [
       log({ ip: '9.9.9.9', userAgent: SAFARI_OLD, path: '/' }),
       log({ ip: '9.9.9.9', userAgent: SAFARI_OLD, path: '/about/' }),
@@ -429,6 +459,7 @@ describe('detectSpoofedBrowsers', () => {
     const out = detectSpoofedBrowsers(
       classified([...realSafari, ...oldSafari, ...oldFirefox]),
       'example.com',
+      { referenceFloor: false },
     );
     expect(out.slice(2, 4).map((e) => e.classification.category)).toEqual([
       'spoofed-browser',
@@ -436,6 +467,93 @@ describe('detectSpoofedBrowsers', () => {
     ]);
     // no asset-loading Firefox session exists, so Firefox cannot be judged
     expect(out.slice(4).map((e) => e.classification.category)).toEqual(['human', 'human']);
+  });
+  describe('reference floor and sibling families', () => {
+    const oldFirefox = [
+      log({ ip: '8.8.8.8', userAgent: FIREFOX, path: '/' }),
+      log({ ip: '8.8.8.8', userAgent: FIREFOX, path: '/about/' }),
+    ];
+    const EDGE_OLD =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0';
+    const IOS_OLD =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1';
+    const before = (entries: LogEntry[]) =>
+      entries.map((e) => ({ ...e, timestamp: 1_700_000_000 }));
+
+    it('judges a family with no asset-loading session by the floor when the window is past asOf', () => {
+      // test timestamps are January 2027, after DEFAULT_REFERENCE_FLOOR.asOf
+      const out = detectSpoofedBrowsers(classified([...realSafari, ...oldFirefox]), 'example.com');
+      expect(out.slice(2).map((e) => e.classification.category)).toEqual([
+        'spoofed-browser',
+        'spoofed-browser',
+      ]);
+    });
+    it('does not apply the floor to a log window older than asOf', () => {
+      const out = detectSpoofedBrowsers(
+        classified(before([...realSafari, ...oldFirefox])),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('raises an observed reference that is below the floor', () => {
+      const CHROME_MID =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+      const CHROME_130 =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+      const onlyLoader = [
+        log({ ip: '2.2.2.2', userAgent: CHROME_MID, path: '/' }),
+        log({ ip: '2.2.2.2', userAgent: CHROME_MID, path: '/css/site.css' }),
+      ];
+      const pair = [
+        log({ ip: '9.9.9.9', userAgent: CHROME_130, path: '/' }),
+        log({ ip: '9.9.9.9', userAgent: CHROME_130, path: '/about/' }),
+      ];
+      // observed reference 125 would keep Chrome 130; the floor of 150 makes it stale
+      const out = detectSpoofedBrowsers(classified([...onlyLoader, ...pair]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+      const noFloor = detectSpoofedBrowsers(classified([...onlyLoader, ...pair]), 'example.com', {
+        referenceFloor: false,
+      });
+      expect(noFloor.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('never lowers an observed reference', () => {
+      const CHROME_140 =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+      const pair = [
+        log({ ip: '9.9.9.9', userAgent: CHROME_140, path: '/' }),
+        log({ ip: '9.9.9.9', userAgent: CHROME_140, path: '/about/' }),
+      ];
+      // observed Chrome 152: 140 is 12 behind, not stale; the floor of 150 must not change that
+      const out = detectSpoofedBrowsers(classified([...realChrome, ...pair]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('shares a reference between Chrome and Edge, and between Safari and iOS, with no floor', () => {
+      const edgePair = [
+        log({ ip: '9.9.9.9', userAgent: EDGE_OLD, path: '/' }),
+        log({ ip: '9.9.9.9', userAgent: EDGE_OLD, path: '/about/' }),
+      ];
+      const iosPair = [
+        log({ ip: '8.8.8.8', userAgent: IOS_OLD, path: '/' }),
+        log({ ip: '8.8.8.8', userAgent: IOS_OLD, path: '/about/' }),
+      ];
+      const out = detectSpoofedBrowsers(
+        classified(before([...realChrome, ...realSafari, ...edgePair, ...iosPair])),
+        'example.com',
+      );
+      expect(out.slice(4).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+    });
+    it('accepts a custom floor and skips families it leaves out', () => {
+      const out = detectSpoofedBrowsers(classified([...realSafari, ...oldFirefox]), 'example.com', {
+        referenceFloor: { asOf: '2026-01-01', majors: { chrome: 150 } },
+      });
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('ignores the floor when referenceMajors is supplied', () => {
+      const out = detectSpoofedBrowsers(classified(oldFirefox), 'example.com', {
+        referenceMajors: { chrome: 150 },
+      });
+      expect(out.every((e) => e.classification.category === 'human')).toBe(true);
+    });
   });
   it('accepts explicit reference versions', () => {
     const oldFirefox = [
@@ -490,12 +608,35 @@ describe('detectSpoofedBrowsers', () => {
       );
       expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
     });
-    it('keeps a stale UA pool that sends no referrers (agent-shaped fetches)', () => {
+    it('demotes a stale UA pool that sends no referrers (mid-November 2026 Tencent Cloud pool)', () => {
       const out = detectSpoofedBrowsers(
         classified([...realChrome, ...poolOf(CHROME_OLD, 20, null)]),
         'example.com',
       );
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+      expect(out.slice(0, 2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('poolReferrerShare restores the Referer requirement', () => {
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 20, null)]),
+        'example.com',
+        { poolReferrerShare: 0.8 },
+      );
       expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('counts pairs the version test already demoted toward the single-request share', () => {
+      // 16 single-request addresses plus 4 two-request addresses: 80% single on
+      // its own, but the two-request pairs are stale with no assets and no
+      // same-site referrer, so the pair test demotes them and the pool is whole.
+      const twoEach = [1, 2, 3, 4].flatMap((i) => [
+        log({ ip: `10.1.0.${i}`, userAgent: CHROME_OLD, path: '/a/', referrer: null }),
+        log({ ip: `10.1.0.${i}`, userAgent: CHROME_OLD, path: '/b/', referrer: null }),
+      ]);
+      const out = detectSpoofedBrowsers(
+        classified([...realChrome, ...poolOf(CHROME_OLD, 16, null), ...twoEach]),
+        'example.com',
+      );
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
     });
     it('keeps a current-version UA pool (ExaUser-shaped proxy fetches)', () => {
       const out = detectSpoofedBrowsers(
@@ -534,6 +675,58 @@ describe('detectSpoofedBrowsers', () => {
         },
       );
       expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+  });
+
+  describe('bareOriginReferrers (Referer with no path)', () => {
+    it('demotes a single-request current-version pair whose Referer is a bare origin', () => {
+      const probe = log({
+        ip: '7.7.7.7',
+        userAgent: CHROME_NEW,
+        path: '/api/events/consume',
+        status: 404,
+        referrer: 'https://example.com',
+      });
+      const out = detectSpoofedBrowsers(classified([...realChrome, probe]), 'example.com');
+      expect(out[2].classification.category).toBe('spoofed-browser');
+      expect(out.slice(0, 2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('treats an http:// bare origin and an off-site bare origin the same way', () => {
+      const entries = [
+        log({ ip: '7.7.7.1', userAgent: CHROME_NEW, referrer: 'http://www.example.com' }),
+        log({ ip: '7.7.7.2', userAgent: FIREFOX, referrer: 'https://other.example' }),
+      ];
+      const out = detectSpoofedBrowsers(classified([...realChrome, ...entries]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'spoofed-browser')).toBe(true);
+    });
+    it('keeps a pair that also rendered pages', () => {
+      const entries = [
+        log({ ip: '7.7.7.7', userAgent: CHROME_NEW, path: '/', referrer: 'https://example.com' }),
+        log({
+          ip: '7.7.7.7',
+          userAgent: CHROME_NEW,
+          path: '/css/site.css',
+          referrer: 'https://example.com/',
+        }),
+      ];
+      const out = detectSpoofedBrowsers(classified([...realChrome, ...entries]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('does not fire on a referrer with a path, including the origin with a trailing slash', () => {
+      const entries = [
+        log({ ip: '7.7.7.1', userAgent: CHROME_NEW, referrer: 'https://example.com/' }),
+        log({ ip: '7.7.7.2', userAgent: CHROME_NEW, referrer: 'https://www.google.com/' }),
+        log({ ip: '7.7.7.3', userAgent: CHROME_NEW, referrer: 'https://example.com/posts/' }),
+      ];
+      const out = detectSpoofedBrowsers(classified([...realChrome, ...entries]), 'example.com');
+      expect(out.slice(2).every((e) => e.classification.category === 'human')).toBe(true);
+    });
+    it('can be disabled with bareOriginReferrers: false', () => {
+      const probe = log({ ip: '7.7.7.7', userAgent: CHROME_NEW, referrer: 'https://example.com' });
+      const out = detectSpoofedBrowsers(classified([...realChrome, probe]), 'example.com', {
+        bareOriginReferrers: false,
+      });
+      expect(out[2].classification.category).toBe('human');
     });
   });
 

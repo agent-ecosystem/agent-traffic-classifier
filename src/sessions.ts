@@ -1,4 +1,5 @@
 import type {
+  ReferenceFloor,
   AgentSeed,
   BrowserFamily,
   ClassifiedEntry,
@@ -62,6 +63,13 @@ const SUBRESOURCE_RE = /\.(css|js|mjs|woff2?|ttf|eot)(\?|$)/i;
 const POOL_SINGLE_SHARE = 0.9;
 /** The crawl-policy file. No browser requests it on its own; see detectSpoofedBrowsers. */
 export const ROBOTS_TXT_RE = /^\/robots\.txt(\?|$)/i;
+/**
+ * A Referer that is a bare origin with no path (`https://example.com`). A browser
+ * serializes an origin-only referrer with a trailing slash (`https://example.com/`),
+ * so the slashless form only comes from code that set the header by hand; see
+ * detectSpoofedBrowsers.
+ */
+export const BARE_ORIGIN_REFERRER_RE = /^https?:\/\/[^/]+$/i;
 
 /**
  * Build per-IP session profiles from access log entries.
@@ -498,6 +506,41 @@ export const DEFAULT_STALE_MAJORS: Record<BrowserFamily, number> = {
 };
 
 /**
+ * Dated lower bound on the per-family version reference used by
+ * detectSpoofedBrowsers. A small site often has no asset-loading session of a
+ * given browser family in a week of logs, or only an old one, which leaves that
+ * family's reference missing or dragged down and lets a stale pool of that
+ * family through. The floor says "as of `asOf`, at least this major exists",
+ * and the computed reference becomes max(observed, floor). It applies only when
+ * the newest timestamp in the entries is at or past `asOf`, so reprocessing
+ * older logs is still judged by the versions that were current then.
+ *
+ * MAINTENANCE: this is a calendar-dependent constant. Each family's value is
+ * set a few majors behind the versions current at `asOf` so it can only be too
+ * low, never too high; too low merely makes the test less aggressive on sites
+ * with no observed reference, since observed references win when higher.
+ * Re-check it at every pattern audit (compare against the newest majors among
+ * asset-loading sessions on the largest site) and bump `majors` and `asOf`
+ * together, keeping the test constants in test/ip-dossier.test.ts current
+ * enough to clear it. Set from the November 2026 audit, where asset-loading
+ * sessions reached Chrome 158, Edge 157, Firefox 160, Safari 27, and iOS 27.
+ */
+export const DEFAULT_REFERENCE_FLOOR: ReferenceFloor = {
+  asOf: '2026-11-01',
+  majors: { chrome: 150, edge: 150, firefox: 150, safari: 26, ios: 26 },
+};
+
+/** Families that share one version line: Edge tracks Chromium's major, iOS Safari tracks desktop Safari's. */
+const SIBLING_FAMILIES: Array<[BrowserFamily, BrowserFamily]> = [
+  ['chrome', 'edge'],
+  ['safari', 'ios'],
+];
+
+function floorAsOfEpoch(asOf: string | number): number {
+  return typeof asOf === 'number' ? asOf : Math.floor(Date.parse(asOf) / 1000);
+}
+
+/**
  * Parse the browser family and major version from a browser-shaped user agent.
  * Returns null for non-browser UAs (bots, libraries, embedded apps with product tokens).
  */
@@ -528,7 +571,12 @@ export function parseBrowserVersion(
  *  - the pair never fetched a static asset and never sent a same-site referrer
  *  - the browser version is stale: at least `staleMajors[family]` majors behind
  *    the newest version of that family seen among pairs that DID load assets
- *    (or behind `referenceMajors[family]` when supplied)
+ *    (or behind `referenceMajors[family]` when supplied). Sibling families
+ *    share a reference (Edge with Chrome, iOS with Safari), and when the log
+ *    window is at or past `DEFAULT_REFERENCE_FLOOR.asOf` the reference is at
+ *    least the floor, so a site with no asset-loading session of a family in
+ *    the window can still judge that family. The floor is a dated constant
+ *    that needs bumping at each audit; see its doc comment.
  *
  * A second, independent trigger (`robotsFetchers`, default on): a browser-UA
  * pair that requested `/robots.txt` and never loaded a static asset. No browser
@@ -551,16 +599,31 @@ export function parseBrowserVersion(
  * (0 of 568 agent requests that week; 11% for ChatGPT-User). A UA is a pool
  * UA when it parses as a browser, is stale by the same threshold as the pair
  * test, appears from at least `poolMinIps` addresses of which 90% or more are
- * single-request, never loaded an asset from any of them, and carried a
- * Referer on at least `poolReferrerShare` of its requests. Every pair wearing
- * it is then demoted, same-site referrers included (the pool reports them).
- * The detector runs per site, and a pool spread over many small sites leaves
- * only a few addresses per UA on each, so the default `poolMinIps` is 5: five
- * independent addresses on one stale string with no asset load from any of
- * them is stronger evidence than the two requests the pair test accepts from
- * one address. In the audit week a threshold of 20 reached 37% of the pool's
- * requests, 10 reached 71%, 5 reached 83%, and every group down to 3 addresses
- * was visibly the same crawler.
+ * single-request (or already demoted by the pair tests above), and never
+ * loaded an asset from any of them. Every pair wearing it is then demoted,
+ * same-site referrers included (the pool reports them). The detector runs per
+ * site, and a pool spread over many small sites leaves only a few addresses
+ * per UA on each, so the default `poolMinIps` is 5: five independent addresses
+ * on one stale string with no asset load from any of them is stronger evidence
+ * than the two requests the pair test accepts from one address. In the audit
+ * week a threshold of 20 reached 37% of the pool's requests, 10 reached 71%,
+ * 5 reached 83%, and every group down to 3 addresses was visibly the same
+ * crawler. `poolReferrerShare` (default 0) can additionally require a Referer
+ * on that share of the pool's requests; the original pool sent one on 99.6%,
+ * but a mid-November 2026 pool on Tencent Cloud addresses (one frozen iOS 13
+ * string, 743 requests from 347 addresses) sent none at all on most sites,
+ * and the agent fetchers the requirement was meant to spare are already kept
+ * out by their current browser versions.
+ *
+ * A fifth trigger (`bareOriginReferrers`, default on): a browser-UA pair that
+ * sent a Referer consisting of a bare origin with no path
+ * (`https://example.com`, see BARE_ORIGIN_REFERRER_RE) and never loaded an
+ * asset. Browsers serialize an origin-only referrer with a trailing slash, so
+ * the slashless form only comes from code that set the header by hand. In
+ * November 2026 logs 1,188 pairs sent one, 1,138 of them single-request,
+ * fetching probe paths and pages that returned 404 from residential addresses
+ * under current Chrome and Firefox strings the version test cannot reach; 16
+ * pairs had also loaded an asset and all of them were self-identifying bots.
  *
  * A fourth trigger (`externalAssetReferrers`, default on): a browser-UA pair
  * that fetched a stylesheet, script, or font with an off-site referrer. A
@@ -593,8 +656,9 @@ export function detectSpoofedBrowsers(
   const robotsFetchers = options?.robotsFetchers ?? true;
   const uaPools = options?.uaPools ?? true;
   const poolMinIps = options?.poolMinIps ?? 5;
-  const poolReferrerShare = options?.poolReferrerShare ?? 0.8;
+  const poolReferrerShare = options?.poolReferrerShare ?? 0;
   const externalAssetReferrers = options?.externalAssetReferrers ?? true;
+  const bareOriginReferrers = options?.bareOriginReferrers ?? true;
 
   type Pair = {
     ua: string;
@@ -602,6 +666,8 @@ export function detectSpoofedBrowsers(
     assets: boolean;
     selfRef: boolean;
     robots: boolean;
+    /** Sent a Referer that is a bare origin with no path. */
+    bareRef: boolean;
     /** Exact off-site referrer URLs this pair sent on a stylesheet, script, or font request. */
     fakeRefs: Set<string>;
     /** Exact off-site referrer URLs this pair sent on any request. */
@@ -609,10 +675,13 @@ export function detectSpoofedBrowsers(
     parsed: ReturnType<typeof parseBrowserVersion>;
   };
   const pairs = new Map<string, Pair>();
+  /** Newest timestamp in the entries, for the dated reference floor. */
+  let newest = -Infinity;
   /** Per UA string: requests, requests with any referrer, and whether any pair loaded an asset. */
   type Pool = { n: number; referred: number; assets: boolean; keys: string[] };
   const pools = new Map<string, Pool>();
   for (const { entry } of classifiedEntries) {
+    if (entry.timestamp > newest) newest = entry.timestamp;
     const key = `${entry.ip}|||${entry.userAgent}`;
     let p = pairs.get(key);
     if (!p) {
@@ -622,6 +691,7 @@ export function detectSpoofedBrowsers(
         assets: false,
         selfRef: false,
         robots: false,
+        bareRef: false,
         fakeRefs: new Set(),
         offsiteRefs: new Set(),
         parsed: parseBrowserVersion(entry.userAgent),
@@ -642,6 +712,7 @@ export function detectSpoofedBrowsers(
     const selfRef = isSameSiteReferrer(entry.referrer, domain);
     if (selfRef) p.selfRef = true;
     if (ROBOTS_TXT_RE.test(entry.path)) p.robots = true;
+    if (entry.referrer && BARE_ORIGIN_REFERRER_RE.test(entry.referrer)) p.bareRef = true;
     if (entry.referrer && !selfRef && p.parsed) {
       p.offsiteRefs.add(entry.referrer);
       if (SUBRESOURCE_RE.test(entry.path)) p.fakeRefs.add(entry.referrer);
@@ -654,13 +725,29 @@ export function detectSpoofedBrowsers(
     }
   }
 
-  // Reference: newest major per family among pairs that behave like browsers.
+  // Reference: newest major per family among pairs that behave like browsers,
+  // shared between sibling families and raised to the dated floor.
   const reference: Partial<Record<BrowserFamily, number>> = { ...options?.referenceMajors };
   if (!options?.referenceMajors) {
     for (const p of pairs.values()) {
       if (!p.parsed || !p.assets) continue;
       const cur = reference[p.parsed.family];
       if (cur === undefined || p.parsed.major > cur) reference[p.parsed.family] = p.parsed.major;
+    }
+    for (const [a, b] of SIBLING_FAMILIES) {
+      const shared = Math.max(reference[a] ?? -1, reference[b] ?? -1);
+      if (shared >= 0) {
+        reference[a] = shared;
+        reference[b] = shared;
+      }
+    }
+    const floor =
+      options?.referenceFloor === undefined ? DEFAULT_REFERENCE_FLOOR : options.referenceFloor;
+    if (floor && newest >= floorAsOfEpoch(floor.asOf)) {
+      for (const family of Object.keys(floor.majors) as BrowserFamily[]) {
+        const major = floor.majors[family];
+        if (major !== undefined && major > (reference[family] ?? -1)) reference[family] = major;
+      }
     }
   }
 
@@ -702,6 +789,10 @@ export function detectSpoofedBrowsers(
       demote.add(key);
       continue;
     }
+    if (bareOriginReferrers && p.bareRef) {
+      demote.add(key);
+      continue;
+    }
     if (p.n < minRequests || p.selfRef) continue;
     if (isStale(p.parsed)) demote.add(key);
   }
@@ -710,7 +801,7 @@ export function detectSpoofedBrowsers(
     for (const [ua, pool] of pools) {
       if (pool.assets || pool.keys.length < poolMinIps) continue;
       if (pool.referred < poolReferrerShare * pool.n) continue;
-      const single = pool.keys.filter((k) => pairs.get(k)!.n < minRequests).length;
+      const single = pool.keys.filter((k) => pairs.get(k)!.n < minRequests || demote.has(k)).length;
       if (single < POOL_SINGLE_SHARE * pool.keys.length) continue;
       const parsed = parseBrowserVersion(ua);
       if (!parsed || !isStale(parsed)) continue;

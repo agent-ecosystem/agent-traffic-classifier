@@ -66,6 +66,10 @@ Then one section per classifier result, each listing distinct User-Agent and Acc
 - **surviving human UA pools** is the proxy-pool view: one UA string used by many addresses, one request each, no asset load. Groups still here after the `uaPools` trigger are usually sites with too few addresses per UA to reach `poolMinIps`.
 - **top external referrers** should contain search engines and real inbound links. A host with page requests roughly equal to distinct addresses and no asset loads is a fake-referrer crawler; look it up in the pools section.
 
+## Re-check the reference floor
+
+`DEFAULT_REFERENCE_FLOOR` in `src/sessions.ts` is a dated lower bound on the newest browser major per family, used by `detectSpoofedBrowsers` when a site has no asset-loading session of that family in the window. It is a calendar-dependent constant and goes quietly out of date. At each audit, compare it against the newest majors among asset-loading sessions on the largest site (the per-site reference table is easy to print from the pairs the session audit builds: newest major per family among human pairs with an asset load) and bump `majors` and `asOf` together, leaving each value a few majors behind what is current so the floor can only be too low. Check that the "current" browser strings in `test/ip-dossier.test.ts` still clear the new floor.
+
 ## Confirming an attribution
 
 A pattern seen in the wild only tells you a fetcher exists, not who runs it. To attribute a fingerprint to a specific product, fetch a quiet site (one with no other content-negotiation traffic) from that product at a noted time, then look for the matching signal entries in that window. Compare the full header set, not just the UA, and repeat for each way the product can reach the web (direct URL fetch, web search, agent mode) since they may use different backends.

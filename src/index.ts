@@ -85,6 +85,7 @@ export {
   parseBrowserVersion,
   DEFAULT_AGENT_IP_WINDOW_SECONDS,
   DEFAULT_STALE_MAJORS,
+  DEFAULT_REFERENCE_FLOOR,
 } from './sessions.js';
 
 // Date utilities
@@ -92,7 +93,7 @@ export { extractDateKey } from './date.js';
 
 // Aggregation
 export { aggregate, normalizePath } from './aggregate.js';
-export { ROBOTS_TXT_RE } from './sessions.js';
+export { ROBOTS_TXT_RE, BARE_ORIGIN_REFERRER_RE } from './sessions.js';
 
 // Defaults (for consumer-side extension)
 export { DEFAULT_PROGRAMMATIC, DEFAULT_EXACT_PROGRAMMATIC } from './defaults/programmatic.js';

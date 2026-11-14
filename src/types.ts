@@ -163,9 +163,20 @@ export interface SpoofedBrowserOptions {
   /**
    * Reference (newest plausible) major version per family. When omitted, computed
    * from the entries themselves: the newest major seen among pairs that loaded
-   * static assets. Families with no reference are never demoted.
+   * static assets, shared between sibling families (Edge with Chrome, iOS with
+   * Safari) and raised to `referenceFloor` when the log window is recent enough.
+   * When supplied, used as-is: no borrowing, no floor. Families with no
+   * reference are never demoted.
    */
   referenceMajors?: Partial<Record<BrowserFamily, number>>;
+  /**
+   * Dated lower bound for the computed reference, applied only to entries whose
+   * newest timestamp is at or past `asOf` so that reprocessing old logs is never
+   * judged by a later calendar. Defaults to `DEFAULT_REFERENCE_FLOOR`; pass
+   * `false` to compute the reference from the entries alone. Ignored when
+   * `referenceMajors` is supplied.
+   */
+  referenceFloor?: ReferenceFloor | false;
   /**
    * Also demote any browser-UA pair that requested `/robots.txt` and never
    * loaded a static asset, regardless of request count, referrers, or browser
@@ -175,14 +186,17 @@ export interface SpoofedBrowserOptions {
   /**
    * Relax the request-count minimum for a user-agent string that is spread one
    * request per IP across a proxy pool: when a stale browser UA appears from at
-   * least `poolMinIps` addresses, nearly all single-request, with no asset load
-   * from any of them and a Referer on at least `poolReferrerShare` of its
-   * requests, every pair wearing that UA is demoted. Default true.
+   * least `poolMinIps` addresses, nearly all single-request (or already demoted
+   * by the per-pair tests), with no asset load from any of them, every pair
+   * wearing that UA is demoted. Default true.
    */
   uaPools?: boolean;
   /** Distinct IPs a stale UA string needs before the pool test applies. Default 5. */
   poolMinIps?: number;
-  /** Share of a pool UA's requests that must carry a Referer. Default 0.8. */
+  /**
+   * Share of a pool UA's requests that must carry a Referer before the pool
+   * test applies. Default 0 (no requirement); 0.8 restores the 0.7.0 behavior.
+   */
   poolReferrerShare?: number;
   /**
    * Also demote any browser-UA pair that fetched a stylesheet, script, or font
@@ -194,6 +208,14 @@ export interface SpoofedBrowserOptions {
    * Default true.
    */
   externalAssetReferrers?: boolean;
+  /**
+   * Also demote any browser-UA pair that sent a Referer consisting of a bare
+   * origin with no path (`https://example.com`) and never loaded a static
+   * asset. Browsers serialize an origin-only referrer with a trailing slash;
+   * the slashless form only comes from code that set the header by hand.
+   * Default true.
+   */
+  bareOriginReferrers?: boolean;
 }
 
 /** Options for detectScanners. */
@@ -212,6 +234,17 @@ export interface ScannerOptions {
 
 /** Browser families recognised by the spoofed-browser version test. */
 export type BrowserFamily = 'chrome' | 'edge' | 'firefox' | 'safari' | 'ios';
+
+/**
+ * A dated lower bound on the newest browser major per family: "as of `asOf`,
+ * at least this major exists". See DEFAULT_REFERENCE_FLOOR.
+ */
+export interface ReferenceFloor {
+  /** ISO date (`YYYY-MM-DD`) or Unix epoch seconds from which the floor applies. */
+  asOf: string | number;
+  /** Lower bound per family. Families left out are not floored. */
+  majors: Partial<Record<BrowserFamily, number>>;
+}
 
 /** Per-agent summary within a signal summary. */
 export interface SignalAgentSummary {

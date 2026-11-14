@@ -1836,6 +1836,162 @@
       "name": "InternetData.io",
       "company": "InternetData",
       "category": "scanner"
+    },
+    {
+      "pattern": "SERankingBacklinksBot",
+      "name": "SE Ranking Backlinks Bot",
+      "company": "SE Ranking",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "panscient",
+      "name": "Panscient",
+      "company": "Panscient",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "KamataBot",
+      "name": "KamataBot",
+      "company": "Kamata",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "MapTheNetBot",
+      "name": "MapTheNetBot",
+      "company": "MapTheNet",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "DomainMetaDataBot",
+      "name": "DomainMetaDataBot",
+      "company": "DomainMetaData",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "Kaupr/",
+      "name": "Kaupr",
+      "company": "Kaupr",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "Vercatus/",
+      "name": "Vercatus",
+      "company": "Vercatus",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "GrowthXBot",
+      "name": "GrowthXBot",
+      "company": "GrowthX",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "CitationTrackerBot",
+      "name": "CitationTrackerBot",
+      "company": "CitationTracker",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "DocumentationAI-AgentScore",
+      "name": "Documentation.AI Agent Score",
+      "company": "Documentation.AI",
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "agent-readiness-index",
+      "name": "agent-readiness-index",
+      "company": null,
+      "category": "seo-bot"
+    },
+    {
+      "pattern": "INETDEX-BOT",
+      "name": "INETDEX-BOT",
+      "company": "INETDEX",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "image-meta.com",
+      "name": "ImageMetaBot",
+      "company": "image-meta.com",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "IsonSearchBot",
+      "name": "IsonSearchBot",
+      "company": "IsonAI",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "HiraxSearchBot",
+      "name": "HiraxSearchBot",
+      "company": "Hirax",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "YepBot",
+      "name": "YepBot",
+      "company": "Ahrefs",
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "SearchBot/0.1 (independent search engine",
+      "name": "SearchBot (independent search engine)",
+      "company": null,
+      "category": "search-crawler"
+    },
+    {
+      "pattern": "FontScanBot",
+      "name": "FontScanBot",
+      "company": "Fontscan",
+      "category": "scanner"
+    },
+    {
+      "pattern": "Assetnote",
+      "name": "Assetnote",
+      "company": "Assetnote",
+      "category": "scanner"
+    },
+    {
+      "pattern": "(personal certificate monitor)",
+      "name": "certificate monitor",
+      "company": null,
+      "category": "monitoring"
+    },
+    {
+      "pattern": "HTML Proofer",
+      "name": "HTML Proofer",
+      "company": null,
+      "category": "monitoring"
+    },
+    {
+      "pattern": "Miravi-Reachability",
+      "name": "Miravi",
+      "company": "Miravi",
+      "category": "monitoring"
+    },
+    {
+      "pattern": "PubSub-revival",
+      "name": "PubSub",
+      "company": "PubSub",
+      "category": "feed-reader"
+    },
+    {
+      "pattern": "TANKbot",
+      "name": "TANKbot",
+      "company": "TANK",
+      "category": "ai-crawler"
+    },
+    {
+      "pattern": "Defuddle/",
+      "name": "Defuddle",
+      "company": null,
+      "category": "agent"
+    },
+    {
+      "pattern": "KagiTranslatePreview",
+      "name": "Kagi Translate",
+      "company": "Kagi",
+      "category": "ai-assistant"
     }
   ]
 }
